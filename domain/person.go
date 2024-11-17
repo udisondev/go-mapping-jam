@@ -5,4 +5,9 @@ type Person struct {
 	LastName string
 	MiddleName string
 	Age int64
+	Account Account
+}
+
+type Account struct {
+	Login, Password string
 }

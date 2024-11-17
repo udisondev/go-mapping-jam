@@ -11,42 +11,50 @@ import (
 	"golang.org/x/tools/go/packages"
 )
 
-type mapImport struct {
-	name string
-	path string
+type Import struct {
+	Name string
+	Path string
 }
 
-func (m mapImport) isNil() bool {
-	return m.path == ""
+type StructHash string
+type FieldHash string
+
+type Struct struct {
+	Name   string
+	Pack   string
+	Path   string
+	Fields []Field
 }
 
-func (m mapImport) dir() string {
-	return fmt.Sprintf("./%s", strings.ReplaceAll(m.path, projectName, ""))
+type Field struct {
+	Name   string
+	Type string
+	Struct *FielsStruct
 }
 
-type mapTypeGoal uint8
-
-const (
-	target mapTypeGoal = iota
-	source
-)
-
-type mapType struct {
-	pack  string
-	imp mapImport
-	value string
-	goal  mapTypeGoal
+type FielsStruct struct {
+	Parent Field
+	Name string
+	Type string
+	Fields []Field
 }
 
-type mapping struct {
-	value string
+type Rule struct {
+	Value string
 }
 
-type mapper struct {
-	methodName string
-	source     mapType
-	target     mapType
-	mappings   []mapping
+type MapFunc struct {
+	Name   string
+	Source *Type
+	Target *Type
+	Rules  []Rule
+}
+
+type Type struct {
+	Pack   string
+	Name   string
+	Import Import
+	Struct *Struct
 }
 
 const projectName = "github.com/udisondev/go-mapping-jam/"
@@ -62,48 +70,40 @@ func main() {
 		log.Fatalf("failed to parse file: %v", err)
 	}
 
-	mapImports := make([]mapImport, 0, len(node.Imports))
+	imports := make(map[ImportAlias]Import)
+	mapFuncs := make(map[string]MapFunc)
+	structs := make(map[StructHash]*Struct)
+	structField := make(map[])
+	imports[ImportAlias(".")] = Import{Path: projectName + "/mapper"}
 
 	for _, v := range node.Imports {
-		mapImports = append(mapImports, extractMapImport(v))
+		imp := extractMapImport(v)
+		imports[ImportAlias(imp.Name)] = imp
 	}
 
 	astMethods := extractMethods(node)
 
-	mappers := make([]mapper, 0, len(astMethods))
-
 	for _, v := range astMethods {
-		mappingRules := make([]mapping, 0, len(v.Doc.List))
+		mappingRules := make([]Rule, 0, len(v.Doc.List))
 		for _, mpr := range v.Doc.List {
-			mappingRules = append(mappingRules, mapping{
-				value: mpr.Text,
+			mappingRules = append(mappingRules, Rule{
+				Value: mpr.Text,
 			})
 		}
 
 		if fType, ok := v.Type.(*ast.FuncType); ok {
-			mappers = append(mappers, mapper{
-				methodName: v.Names[0].Name,
-				source:     extractMapType(fType.Params, source),
-				target:     extractMapType(fType.Results, target),
-				mappings:   mappingRules,
-			})
-		}
-	}
+			source := extractType(fType.Params, imports)
+			target := extractType(fType.Results, imports)
+			structs[source.Hash()] = source.Struct
+			structs[target.Hash()] = target.Struct
+			m := MapFunc{
+				Name:   v.Names[0].Name,
+				Source: &source,
+				Target: &target,
+				Rules:  mappingRules,
+			}
 
-	for idx, v := range mappers {
-		if v.source.pack != "" {
-			for _, i := range mapImports {
-				if v.source.pack == i.name {
-					mappers[idx].source.imp = i
-				}
-			}
-		}
-		if v.target.pack != "" {
-			for _, i := range mapImports {
-				if v.target.pack == i.name {
-					mappers[idx].target.imp = i
-				}
-			}
+			mapFuncs[m.Name] = m
 		}
 	}
 
@@ -117,31 +117,30 @@ func main() {
 		Fset: fset,
 	}
 
-	pksDirs = map[string]struct{}
+	structPathMap := make(map[StructHash]string)
 
-	pkgs := make(map[string]*packages.Package)
-
-	for _, v := range mappers {
-		getDir()
-		uploadPacks := func(dir, strName string) {
-			pks, err := packages.Load(cfg, dir)
-			if err != nil {
-				panic(err)
-			}
-			pkgs[strName] = pks[0]
-		}
-
-		if !v.source.imp.isNil() {
-			uploadPacks(v.source.imp.dir(), v.source.value)	
-		}
-
-		if !v.target.imp.isNil() {
-			uploadPacks(v.target.imp.dir(), v.target.value)	
-		}
-
+	for _, v := range structs {
+		structPathMap[v.Hash()] = DirFromPack(v.Pack)
 	}
 
-	fmt.Println(pkgs)	
+	structPackMap := make(map[StructHash]*packages.Package)
+	uploadPacks := func(hash StructHash, dir string) {
+		pks, err := packages.Load(cfg, dir)
+		if err != nil {
+			panic(err)
+		}
+		structPackMap[hash] = pks[0]
+	}
+
+	for k, v := range structPathMap {
+		uploadPacks(k, v)
+	}
+
+	for s, p := range structPackMap {
+		path := p.ID
+		fmt.Println(path)
+		fillObjs(structs[s], p)
+	}
 
 	// pkgs, err := packages.Load(cfg, ".")
 	// if err != nil {
@@ -198,21 +197,22 @@ func main() {
 	// }
 
 	// log.Printf("Generated file: %s", outputFile)
+
 }
 
-func extractMapImport(i *ast.ImportSpec) mapImport {
-	out := mapImport{}
+func extractMapImport(i *ast.ImportSpec) Import {
+	out := Import{}
 	path := strings.ReplaceAll(i.Path.Value, "\"", "")
-	out.path = path
+	out.Path = path
 
 	if i.Name != nil {
-		out.name = i.Name.Name
+		out.Name = i.Name.Name
 		return out
 	}
 
 	pathElements := strings.Split(path, "/")
 	lastPathElement := pathElements[len(pathElements)-1]
-	out.name = lastPathElement
+	out.Name = lastPathElement
 
 	return out
 }
@@ -231,15 +231,90 @@ func extractMethods(n ast.Node) []*ast.Field {
 	return out
 }
 
-func extractMapType(v *ast.FieldList, goal mapTypeGoal) mapType {
-	out := mapType{goal: goal}
+func extractType(v *ast.FieldList, impMap map[ImportAlias]Import) Type {
+	out := Type{}
 	switch expr := v.List[0].Type.(type) {
 	case *ast.Ident:
-		out.value = expr.Name
+		imp := impMap[ImportAlias(".")]
+		out.Import = imp
+		out.Name = expr.Name
+		out.Struct = &Struct{
+			Name: expr.Name,
+			Pack: imp.Path,
+		}
 	case *ast.SelectorExpr:
-		out.pack = expr.X.(*ast.Ident).Name
-		out.value = expr.Sel.Name
+		out.Pack = expr.X.(*ast.Ident).Name
+		imp := impMap[ImportAlias(out.Pack)]
+		out.Import = imp
+		out.Name = expr.Sel.Name
+		out.Struct = &Struct{
+			Name: expr.Sel.Name,
+			Pack: imp.Path,
+		}
 	}
 
 	return out
+}
+
+func (s Struct) Hash() StructHash {
+	if s.Path == "" {
+		fmt.Sprintf("%s.%s", s.Pack, s.)
+	}
+	return StructHash(s.Pack + "." + s.Name)
+}
+
+func (i Import) Dir() string {
+	return fmt.Sprintf("./%s", strings.ReplaceAll(i.Path, projectName, ""))
+}
+
+func DirFromPack(pack string) string {
+	return fmt.Sprintf("./%s", strings.ReplaceAll(pack, projectName, ""))
+}
+
+func fillObjs(fieldSet func(f Field), p *ast.TypeSpec, stMap map[StructHash]*Struct, path string) *Struct {
+	if ts, ok := p.Type.(*ast.StructType); ok {
+		panic("is not a struct")
+	} else {
+		if isDepth(ts) {
+			str := &Struct{
+				Name: p.Name.Name,
+				Pack: path,
+			}
+
+		}
+	}
+
+}
+
+func buildField(f *ast.Field, pack string) Field {
+	t, ok := f.Type.(*ast.Ident)
+	if !ok {
+		panic("field type is not ast.Ident")
+	}
+	if t.Obj == nil {
+		return Field{
+			Name: f.Names[0].Name,
+			Type: Type{
+				Pack:   pack,
+				Name:   t.Name,
+				Struct: nil,
+			},
+		}
+	}
+
+	Struct{
+		Name: t.Obj.Name,
+		Pack: pack,
+	}
+}
+
+func isDepth(s *ast.StructType) bool {
+	for _, v := range s.Fields.List {
+		if t, ok := v.Type.(*ast.Ident); ok {
+			if t.Obj != nil {
+				return false
+			}
+		}
+	}
+	return true
 }
