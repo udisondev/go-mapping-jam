@@ -5,38 +5,51 @@ import (
 	"go/ast"
 	"go/parser"
 	"go/token"
+	"go/types"
 	"log"
 	"strings"
 
 	"golang.org/x/tools/go/packages"
 )
 
-type Import struct {
-	Name string
-	Path string
-}
-
 type StructHash string
 type FieldHash string
+type ImportAlias string
+type FieldName string
+type Pack string
+type Direction uint8
+
+type FullType struct {
+	ShortPackName string
+	StructName    string
+}
+
+const (
+	Source Direction = iota + 1
+	Target
+)
+
+type Import struct {
+	Alias ImportAlias
+	Pack  Pack
+}
+
+type StructField interface {
+	isField()
+}
+
+func (s *Struct) isField()    {}
+func (p *Primetive) isField() {}
 
 type Struct struct {
-	Name   string
-	Pack   string
-	Path   string
-	Fields []Field
+	Owner *Struct
+	Pack     Pack
+	FullType FullType
+	Fields   map[FieldName]*StructField
 }
 
-type Field struct {
-	Name   string
+type Primetive struct {
 	Type string
-	Struct *FielsStruct
-}
-
-type FielsStruct struct {
-	Parent Field
-	Name string
-	Type string
-	Fields []Field
 }
 
 type Rule struct {
@@ -44,20 +57,20 @@ type Rule struct {
 }
 
 type MapFunc struct {
-	Name   string
-	Source *Type
-	Target *Type
-	Rules  []Rule
+	Imports  map[Pack]Import
+	Name     string
+	Mappable map[Direction]*MappingRoot
+	Rules    []Rule
 }
 
-type Type struct {
-	Pack   string
-	Name   string
+type MappingRoot struct {
 	Import Import
 	Struct *Struct
 }
 
 const projectName = "github.com/udisondev/go-mapping-jam/"
+
+var pkgs = make(map[Pack]*packages.Package)
 
 func main() {
 	// Путь к файлу с интерфейсом
@@ -72,13 +85,11 @@ func main() {
 
 	imports := make(map[ImportAlias]Import)
 	mapFuncs := make(map[string]MapFunc)
-	structs := make(map[StructHash]*Struct)
-	structField := make(map[])
-	imports[ImportAlias(".")] = Import{Path: projectName + "/mapper"}
+	imports[ImportAlias(".")] = Import{Alias: ImportAlias("."), Pack: Pack(projectName + "/mapper")}
 
 	for _, v := range node.Imports {
 		imp := extractMapImport(v)
-		imports[ImportAlias(imp.Name)] = imp
+		imports[ImportAlias(imp.Alias)] = imp
 	}
 
 	astMethods := extractMethods(node)
@@ -92,15 +103,13 @@ func main() {
 		}
 
 		if fType, ok := v.Type.(*ast.FuncType); ok {
-			source := extractType(fType.Params, imports)
-			target := extractType(fType.Results, imports)
-			structs[source.Hash()] = source.Struct
-			structs[target.Hash()] = target.Struct
+			source := extractMappingRoot(fType.Params, imports)
+			target := extractMappingRoot(fType.Results, imports)
 			m := MapFunc{
-				Name:   v.Names[0].Name,
-				Source: &source,
-				Target: &target,
-				Rules:  mappingRules,
+				Imports: make(map[Pack]Import),
+				Name:     v.Names[0].Name,
+				Mappable: map[Direction]*MappingRoot{Source: &source, Target: &target},
+				Rules:    mappingRules,
 			}
 
 			mapFuncs[m.Name] = m
@@ -117,29 +126,17 @@ func main() {
 		Fset: fset,
 	}
 
-	structPathMap := make(map[StructHash]string)
-
-	for _, v := range structs {
-		structPathMap[v.Hash()] = DirFromPack(v.Pack)
-	}
-
-	structPackMap := make(map[StructHash]*packages.Package)
-	uploadPacks := func(hash StructHash, dir string) {
-		pks, err := packages.Load(cfg, dir)
-		if err != nil {
-			panic(err)
+	for _, v := range mapFuncs {
+		packFunc := func(dir string) *packages.Package {
+			pks, err := packages.Load(cfg, dir)
+			if err != nil {
+				panic(err)
+			}
+			return pks[0]
 		}
-		structPackMap[hash] = pks[0]
-	}
 
-	for k, v := range structPathMap {
-		uploadPacks(k, v)
-	}
-
-	for s, p := range structPackMap {
-		path := p.ID
-		fmt.Println(path)
-		fillObjs(structs[s], p)
+		v.initRoot(v.Mappable[Source], packFunc)
+		v.initRoot(v.Mappable[Target], packFunc)
 	}
 
 	// pkgs, err := packages.Load(cfg, ".")
@@ -202,17 +199,17 @@ func main() {
 
 func extractMapImport(i *ast.ImportSpec) Import {
 	out := Import{}
-	path := strings.ReplaceAll(i.Path.Value, "\"", "")
-	out.Path = path
+	pack := strings.ReplaceAll(i.Path.Value, "\"", "")
+	out.Pack = Pack(pack)
 
 	if i.Name != nil {
-		out.Name = i.Name.Name
+		out.Alias = ImportAlias(i.Name.Name)
 		return out
 	}
 
-	pathElements := strings.Split(path, "/")
+	pathElements := strings.Split(pack, "/")
 	lastPathElement := pathElements[len(pathElements)-1]
-	out.Name = lastPathElement
+	out.Alias = ImportAlias(lastPathElement)
 
 	return out
 }
@@ -231,90 +228,131 @@ func extractMethods(n ast.Node) []*ast.Field {
 	return out
 }
 
-func extractType(v *ast.FieldList, impMap map[ImportAlias]Import) Type {
-	out := Type{}
+func extractMappingRoot(v *ast.FieldList, impMap map[ImportAlias]Import) MappingRoot {
+	out := MappingRoot{Struct: &Struct{Fields: make(map[FieldName]*StructField)}}
 	switch expr := v.List[0].Type.(type) {
 	case *ast.Ident:
 		imp := impMap[ImportAlias(".")]
 		out.Import = imp
-		out.Name = expr.Name
-		out.Struct = &Struct{
-			Name: expr.Name,
-			Pack: imp.Path,
-		}
+		out.Struct.FullType = FullType{StructName: expr.Name}
+		out.Struct.Pack = imp.Pack
 	case *ast.SelectorExpr:
-		out.Pack = expr.X.(*ast.Ident).Name
-		imp := impMap[ImportAlias(out.Pack)]
+		imp := impMap[ImportAlias(expr.X.(*ast.Ident).Name)]
 		out.Import = imp
-		out.Name = expr.Sel.Name
-		out.Struct = &Struct{
-			Name: expr.Sel.Name,
-			Pack: imp.Path,
-		}
+		out.Struct.FullType = FullType{ShortPackName: expr.X.(*ast.Ident).Name, StructName: expr.Sel.Name}
+		out.Struct.Pack = imp.Pack
 	}
 
 	return out
 }
 
 func (s Struct) Hash() StructHash {
-	if s.Path == "" {
-		fmt.Sprintf("%s.%s", s.Pack, s.)
-	}
-	return StructHash(s.Pack + "." + s.Name)
+	return StructHash(string(s.Pack) + "." + s.FullType.StructName)
 }
 
-func (i Import) Dir() string {
-	return fmt.Sprintf("./%s", strings.ReplaceAll(i.Path, projectName, ""))
+func (p Pack) Dir() string {
+	return fmt.Sprintf("./%s", strings.ReplaceAll(string(p), projectName, ""))
 }
 
-func DirFromPack(pack string) string {
-	return fmt.Sprintf("./%s", strings.ReplaceAll(pack, projectName, ""))
-}
-
-func fillObjs(fieldSet func(f Field), p *ast.TypeSpec, stMap map[StructHash]*Struct, path string) *Struct {
-	if ts, ok := p.Type.(*ast.StructType); ok {
-		panic("is not a struct")
-	} else {
-		if isDepth(ts) {
-			str := &Struct{
-				Name: p.Name.Name,
-				Pack: path,
-			}
-
-		}
-	}
-
-}
-
-func buildField(f *ast.Field, pack string) Field {
-	t, ok := f.Type.(*ast.Ident)
+func (m *MapFunc) initRoot(mr *MappingRoot, packFunc func(dir string) *packages.Package) {
+	pkg, ok := pkgs[mr.Struct.Pack]
 	if !ok {
-		panic("field type is not ast.Ident")
+		pkg = packFunc(string(mr.Import.Pack.Dir()))
+		pkgs[mr.Struct.Pack] = pkg
 	}
-	if t.Obj == nil {
-		return Field{
-			Name: f.Names[0].Name,
-			Type: Type{
-				Pack:   pack,
-				Name:   t.Name,
-				Struct: nil,
-			},
-		}
+	strObj, ok := pkg.Syntax[0].Scope.Objects[mr.Struct.FullType.StructName]
+	if !ok {
+		panic(fmt.Sprintf("has not %s TypeSpec", mr.Struct.FullType.StructName))
 	}
 
-	Struct{
-		Name: t.Obj.Name,
-		Pack: pack,
+	strTs, ok := strObj.Decl.(*ast.TypeSpec)
+	if !ok {
+		panic(fmt.Sprintf("%s is not a TypeSpec", mr.Struct.FullType.StructName))
 	}
+
+	st, ok := strTs.Type.(*ast.StructType)
+	if !ok {
+		panic("is not a struct")
+	}
+
+	for _, v := range st.Fields.List {
+		field := m.buildField(nil, v, pkg.Types)
+		mr.Struct.Fields[FieldName(v.Names[0].Name)] = &field
+	}
+
+	fmt.Println(strTs)
 }
 
-func isDepth(s *ast.StructType) bool {
-	for _, v := range s.Fields.List {
-		if t, ok := v.Type.(*ast.Ident); ok {
-			if t.Obj != nil {
-				return false
+
+func (m *MapFunc) buildField(owner *Struct, astf *ast.Field, p *types.Package) StructField {
+	if t, ok := astf.Type.(*ast.Ident); ok {
+		if t.Obj == nil {
+			return &Primetive{
+				Type: t.Name,
 			}
 		}
 	}
-	return true
+	t := astf.Names[0]
+	if t.Obj == nil {
+		return &Primetive{
+			Type: t.Name,
+		}
+	}
+
+	var fullType FullType
+	switch ft := astf.Type.(type) {
+	case *ast.SelectorExpr:
+		packName, ok := ft.X.(*ast.Ident)
+		if !ok {
+			panic(fmt.Sprintf("could not extract pack name for %s", astf.Names[0].Name))
+		}
+
+		fullType = FullType{ShortPackName: packName.Name, StructName: ft.Sel.Name}
+		imp := findImport(fullType, p)
+		m.addImport(*imp)
+	}
+
+	fs := Struct{
+		FullType: fullType,
+	}
+
+	if owner != nil {
+		fs.Owner = owner
+	}
+
+	ts, ok := astf.Type.(*ast.StructType)
+	if !ok {
+		panic("is not a struct")
+	}
+
+	for _, v := range ts.Fields.List {
+		field := m.buildField(&fs, v, p)
+		fs.Fields[FieldName(v.Names[0].Name)] = &field
+	}
+
+	return &fs
+
+}
+
+func (m *MapFunc) addImport(imp Import) {
+	m.Imports[imp.Pack] = imp
+}
+
+func findImport(ft FullType, p *types.Package) *Import {
+	if p.Name() == ft.ShortPackName {
+		return &Import{Alias: ImportAlias(p.Name()), Pack: Pack(p.Path())}
+	}
+
+	if len(p.Imports()) < 1 {
+		return nil
+	}
+
+	for _, othp := range p.Imports() {
+		imp := findImport(ft, othp)
+		if imp != nil {
+			return imp
+		}
+	}
+
+	panic(fmt.Sprintf("package for %s not found: ft"))
 }
