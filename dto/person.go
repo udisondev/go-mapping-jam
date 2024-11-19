@@ -8,4 +8,9 @@ type Person struct {
 	MiddleName string
 	Age int64
 	Account external.Account
+	Profile Profile
+}
+
+type Profile struct {
+	Phone string
 }

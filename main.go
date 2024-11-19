@@ -10,6 +10,8 @@ import (
 
 	"strings"
 
+	"golang.org/x/text/cases"
+	"golang.org/x/text/language"
 	"golang.org/x/tools/go/packages"
 
 	jen "github.com/dave/jennifer/jen"
@@ -329,7 +331,7 @@ func generateMapFunc(f *jen.File, mapFunc MapFunc) {
 					g.Id("target").Dot(string(sourceFieldName)).Op("=").Id("src").Dot(string(sourceFieldName))
 				} else if sourceStruct, ok := sourceField.(*Struct); ok {
 					// Если это структура
-					subMethodName := fmt.Sprintf("Map%sTo%s", sourceStruct.FullType.StructName, targetField.(*Struct).FullType.StructName)
+					subMethodName := fmt.Sprintf("Map%sTo%s", structNameForNestedMapper(sourceStruct), structNameForNestedMapper(targetField.(*Struct)))
 					g.Id("target").Dot(string(sourceFieldName)).Op("=").Id("m").Dot(subMethodName).Call(jen.Id("src").Dot(string(sourceFieldName)))
 
 					// Генерируем подметод для вложенных структур
@@ -377,8 +379,8 @@ func generateSubMapper(f *jen.File, methodName string, sourceStruct *Struct, tar
 			if targetField, ok := targetStruct.Fields[sourceFieldName]; ok {
 				if _, ok := sourceField.(*Primetive); ok {
 					g.Id("target").Dot(string(sourceFieldName)).Op("=").Id("src").Dot(string(sourceFieldName))
-				} else if nestedSourceStruct, ok := sourceField.(*Struct); ok {
-					nestedMethodName := fmt.Sprintf("Map%sTo%s", nestedSourceStruct.FullType.StructName, targetField.(*Struct).FullType.StructName)
+				} else if nestedSourceStruct, ok := sourceField.(*Struct); ok {					
+					nestedMethodName := fmt.Sprintf("Map%sTo%s", structNameForNestedMapper(nestedSourceStruct), structNameForNestedMapper(targetField.(*Struct)))
 					g.Id("target").Dot(string(sourceFieldName)).Op("=").Id("m").Dot(nestedMethodName).Call(jen.Id("src").Dot(string(sourceFieldName)))
 
 					// Рекурсивно генерируем вложенные подметоды
@@ -389,4 +391,13 @@ func generateSubMapper(f *jen.File, methodName string, sourceStruct *Struct, tar
 
 		g.Return(jen.Id("target"))
 	})
+}
+
+func structNameForNestedMapper(s *Struct) string {
+	caser := cases.Title(language.English)
+	if s.FullType.ShortPackName != "" {
+		return caser.String(s.FullType.ShortPackName) + caser.String(s.FullType.StructName)
+	}
+
+	return s.FullType.StructName
 }

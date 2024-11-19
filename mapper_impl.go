@@ -12,30 +12,42 @@ type MapperImpl struct{}
 
 func (m *MapperImpl) MapPersonToDTO(src domain.Person) dto.Person {
 	target := dto.Person{}
-	target.Account = m.MapAccountToAccount(src.Account)
 	target.FirstName = src.FirstName
 	target.LastName = src.LastName
 	target.MiddleName = src.MiddleName
 	target.Age = src.Age
+	target.Account = m.MapExternalAccountToExternalAccount(src.Account)
+	target.Profile = m.MapDomainProfileToDtoProfile(src.Profile)
 	return target
 }
-func (m *MapperImpl) MapAccountToAccount(src external.Account) external.Account {
+func (m *MapperImpl) MapExternalAccountToExternalAccount(src external.Account) external.Account {
 	target := external.Account{}
-	target.Login = m.MapLoginToLogin(src.Login)
 	target.Password = src.Password
+	target.Login = m.MapUserLoginToUserLogin(src.Login)
 	return target
 }
-func (m *MapperImpl) MapLoginToLogin(src user.Login) user.Login {
+func (m *MapperImpl) MapUserLoginToUserLogin(src user.Login) user.Login {
 	target := user.Login{}
 	target.Value = src.Value
 	return target
 }
+func (m *MapperImpl) MapDomainProfileToDtoProfile(src domain.Profile) dto.Profile {
+	target := dto.Profile{}
+	target.Phone = src.Phone
+	return target
+}
 func (m *MapperImpl) MapPersonToDomain(src dto.Person) domain.Person {
 	target := domain.Person{}
+	target.LastName = src.LastName
 	target.MiddleName = src.MiddleName
 	target.Age = src.Age
-	target.Account = m.MapAccountToAccount(src.Account)
+	target.Account = m.MapExternalAccountToExternalAccount(src.Account)
+	target.Profile = m.MapDtoProfileToDomainProfile(src.Profile)
 	target.FirstName = src.FirstName
-	target.LastName = src.LastName
+	return target
+}
+func (m *MapperImpl) MapDtoProfileToDomainProfile(src dto.Profile) domain.Profile {
+	target := domain.Profile{}
+	target.Phone = src.Phone
 	return target
 }
