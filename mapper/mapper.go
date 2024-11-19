@@ -10,5 +10,6 @@ import (
 type Mapper interface {
 	// descr
 	// sec
-    MapPerson(p domain.Person) d.Person
+    MapPersonToDTO(p domain.Person) d.Person
+    MapPersonToDomain(p d.Person) domain.Person
 }
