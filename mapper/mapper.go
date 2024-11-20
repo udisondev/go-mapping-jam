@@ -8,8 +8,7 @@ import (
 
 
 type Mapper interface {
-	// descr
-	// sec
+	//qual={source="Firstname" target="FirstName"}
     MapPersonToDTO(p domain.Person) d.Person
     MapPersonToDomain(p d.Person) domain.Person
 }

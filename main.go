@@ -53,7 +53,13 @@ type Primetive struct {
 }
 
 type Rule struct {
-	Value string
+	
+}
+
+type NamingRule struct {
+	SourceName string
+	TargetName string
+	CustomMethodName string
 }
 
 type MapFunc struct {
@@ -94,6 +100,12 @@ func main() {
 		var mappingRules []Rule
 		if v.Doc != nil {
 			for _, mpr := range v.Doc.List {
+				rules := strings.Split(strings.TrimSpace(strings.ReplaceAll(mpr.Text, "//", "")), " ")
+				for _, r := range rules {
+					if strings.HasPrefix(r, "qual") {
+						
+					}
+				}
 				mappingRules = append(mappingRules, Rule{
 					Value: mpr.Text,
 				})
