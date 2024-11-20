@@ -8,6 +8,7 @@ import (
 	"go/types"
 	"log"
 	"math/rand/v2"
+	"regexp"
 	"time"
 
 	"strings"
@@ -52,20 +53,45 @@ type Primetive struct {
 	Type string
 }
 
-type Rule struct {
-	
+type QualRule struct {
+	SourceName       FieldName
+	TargetName       FieldName
+	CustomMethodName string
 }
 
-type NamingRule struct {
-	SourceName string
-	TargetName string
-	CustomMethodName string
+type EnumRule struct {
+	EnumMapping map[string]string
+}
+
+type RuleType uint8
+
+const (
+	Qual RuleType = iota + 1
+	Enum
+)
+
+type Rule interface {
+	Type() RuleType
+}
+
+func (nr QualRule) Type() RuleType { return Qual }
+func (er EnumRule) Type() RuleType { return Enum }
+
+// Фабрики для правил
+type RuleFactory func(string) Rule
+
+// Глобальная карта парсеров
+var ruleParsers = map[string]RuleFactory{}
+
+// Регистрация парсеров
+func registerRuleParser(name string, factory RuleFactory) {
+	ruleParsers[name] = factory
 }
 
 type MapFunc struct {
 	Name     string
 	Mappable map[Direction]*Struct
-	Rules    []Rule
+	Rules    map[RuleType]Rule
 }
 
 const projectName = "github.com/udisondev/go-mapping-jam"
@@ -75,6 +101,9 @@ var thisPack = &Pack{Alias: "", Path: projectName + "/mapping"}
 var pkgs = make(map[string]*packages.Package)
 
 func main() {
+	registerRuleParser("qual", parseQualRule)
+	registerRuleParser("enum", parseEnumRule)
+
 	// Путь к файлу с интерфейсом
 	interfaceFile := "./mapper/mapper.go"
 
@@ -97,18 +126,13 @@ func main() {
 	astMethods := extractMethods(node)
 
 	for _, v := range astMethods {
-		var mappingRules []Rule
+		mappingRules := make(map[RuleType]Rule)
 		if v.Doc != nil {
 			for _, mpr := range v.Doc.List {
-				rules := strings.Split(strings.TrimSpace(strings.ReplaceAll(mpr.Text, "//", "")), " ")
+				rules := parseRules(strings.TrimSpace(strings.ReplaceAll(mpr.Text, "//", "")))
 				for _, r := range rules {
-					if strings.HasPrefix(r, "qual") {
-						
-					}
+					mappingRules[r.Type()] = r
 				}
-				mappingRules = append(mappingRules, Rule{
-					Value: mpr.Text,
-				})
 			}
 		}
 
@@ -336,24 +360,30 @@ func generateMapFunc(f *jen.File, mapFunc MapFunc) {
 			g.Id("target").Op(":=").Qual(targetStruct.Pack.Path, targetStruct.FullType.StructName+"{}")
 		}
 
-		for sourceFieldName, sourceField := range mapFunc.Mappable[Source].Fields {
-			if targetField, ok := mapFunc.Mappable[Target].Fields[sourceFieldName]; ok {
+		for targetFieldName, targetField := range mapFunc.Mappable[Target].Fields {
+			qual := mapFunc.Rules[Qual]
+			sourceFieldName := targetFieldName
+			if q, ok := qual.(QualRule); ok && q.TargetName == targetFieldName {
+				sourceFieldName = q.SourceName
+			}
+
+			if sourceField, ok := mapFunc.Mappable[Source].Fields[sourceFieldName]; ok {
 				// Если это примитивное поле
-				if _, ok := sourceField.(*Primetive); ok {
-					g.Id("target").Dot(string(sourceFieldName)).Op("=").Id("src").Dot(string(sourceFieldName))
-				} else if sourceStruct, ok := sourceField.(*Struct); ok {
-					hash := string(sourceStruct.Hash()) + string(targetField.(*Struct).Hash())
+				if _, ok := targetField.(*Primetive); ok {
+					g.Id("target").Dot(string(targetFieldName)).Op("=").Id("src").Dot(string(sourceFieldName))
+				} else if targetStruct, ok := targetField.(*Struct); ok {
+					hash := string(targetStruct.Hash()) + string(sourceField.(*Struct).Hash())
 					subMethodName, ok := subMappers[hash]
 					if !ok {
 						subMethodName = genRandomName(15)
 						subMappers[hash] = subMethodName
 					}
 					// Если это структура
-					g.Id("target").Dot(string(sourceFieldName)).Op("=").Id("m").Dot(subMethodName).Call(jen.Id("src").Dot(string(sourceFieldName)))
+					g.Id("target").Dot(string(targetFieldName)).Op("=").Id("m").Dot(subMethodName).Call(jen.Id("src").Dot(string(sourceFieldName)))
 
 					if !ok {
 						// Генерируем подметод для вложенных структур
-						generateSubMapper(f, subMethodName, sourceStruct, targetField.(*Struct), mapFunc)
+						generateSubMapper(f, subMethodName, sourceField.(*Struct), targetStruct, mapFunc)
 					}
 				}
 			}
@@ -389,18 +419,24 @@ func generateSubMapper(f *jen.File, methodName string, sourceStruct *Struct, tar
 			g.Id("target").Op(":=").Qual(targetStruct.Pack.Path, targetStruct.FullType.StructName+"{}")
 		}
 
-		for sourceFieldName, sourceField := range sourceStruct.Fields {
-			if targetField, ok := targetStruct.Fields[sourceFieldName]; ok {
+		for targetFieldName, targetField := range targetStruct.Fields {
+			qual := mapFunc.Rules[Qual]
+			sourceFieldName := targetFieldName
+			if q, ok := qual.(QualRule); ok && q.TargetName == targetFieldName {
+				sourceFieldName = q.SourceName
+			}
+
+			if sourceField, ok := sourceStruct.Fields[sourceFieldName]; ok {
 				if _, ok := sourceField.(*Primetive); ok {
-					g.Id("target").Dot(string(sourceFieldName)).Op("=").Id("src").Dot(string(sourceFieldName))
+					g.Id("target").Dot(string(targetFieldName)).Op("=").Id("src").Dot(string(sourceFieldName))
 				} else if nestedSourceStruct, ok := sourceField.(*Struct); ok {
-					hash := string(nestedSourceStruct.Hash()) + string(targetStruct.Hash())
+					hash := string(nestedSourceStruct.Hash()) + string(targetField.(*Struct).Hash())
 					methodName, ok := subMappers[hash]
 					if !ok {
 						methodName = genRandomName(15)
 						subMappers[hash] = methodName
 					}
-					g.Id("target").Dot(string(sourceFieldName)).Op("=").Id("m").Dot(methodName).Call(jen.Id("src").Dot(string(sourceFieldName)))
+					g.Id("target").Dot(string(targetFieldName)).Op("=").Id("m").Dot(methodName).Call(jen.Id("src").Dot(string(sourceFieldName)))
 
 					if !ok {
 						// Рекурсивно генерируем вложенные подметоды
@@ -428,4 +464,61 @@ func genRandomName(length int) string {
 		result[i] = charset[r.IntN(len(charset))]
 	}
 	return string(result)
+}
+
+func parseRules(input string) []Rule {
+	var rules []Rule
+
+	// Регэксп для поиска блоков типа `qual={...}` или `enum={...}`
+	re := regexp.MustCompile(`(\w+)={(.*?)}`)
+	matches := re.FindAllStringSubmatch(input, -1)
+
+	for _, match := range matches {
+		if len(match) != 3 {
+			panic(fmt.Sprintf("invalid rule block: %v", match))
+		}
+		ruleType := match[1]
+		ruleData := match[2]
+
+		// Проверяем, зарегистрирован ли парсер для типа
+		parser, ok := ruleParsers[ruleType]
+		if !ok {
+			panic(fmt.Sprintf("unknown rule type: %s", ruleType))
+		}
+
+		// Парсим правило
+		rule := parser(ruleData)
+		rules = append(rules, rule)
+	}
+
+	return rules
+}
+
+// Парсер для QualRule
+func parseQualRule(data string) Rule {
+	// Используем регэксп для извлечения данных
+	re := regexp.MustCompile(`source="([^"]+)"\s+target="([^"]+)"`)
+	matches := re.FindStringSubmatch(data)
+	if len(matches) != 3 {
+		panic(fmt.Sprintf("invalid qual format: %s", data))
+	}
+	return QualRule{
+		SourceName: FieldName(matches[1]),
+		TargetName: FieldName(matches[2]),
+	}
+}
+
+// Парсер для EnumRule
+func parseEnumRule(data string) Rule {
+	// Используем регэксп для извлечения пар ключ=значение
+	re := regexp.MustCompile(`(\w+)=([\w]+)`)
+	matches := re.FindAllStringSubmatch(data, -1)
+	if matches == nil {
+		panic(fmt.Sprintf("invalid enum format: %s", data))
+	}
+	enumMap := make(map[string]string)
+	for _, match := range matches {
+		enumMap[match[1]] = match[2]
+	}
+	return EnumRule{EnumMapping: enumMap}
 }

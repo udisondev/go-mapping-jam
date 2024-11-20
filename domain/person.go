@@ -3,7 +3,7 @@ package domain
 import "github.com/udisondev/go-mapping-jam/external"
 
 type Person struct {
-	FirstName string
+	Firstname string
 	LastName string
 	MiddleName string
 	Age int64
