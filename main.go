@@ -7,11 +7,11 @@ import (
 	"go/token"
 	"go/types"
 	"log"
+	"math/rand/v2"
+	"time"
 
 	"strings"
 
-	"golang.org/x/text/cases"
-	"golang.org/x/text/language"
 	"golang.org/x/tools/go/packages"
 
 	jen "github.com/dave/jennifer/jen"
@@ -321,7 +321,7 @@ func generateMapFunc(f *jen.File, mapFunc MapFunc) {
 		if targetStruct.Pack == thisPack {
 			g.Id("target").Op(":=").Id(targetStruct.FullType.StructName + "{}")
 		} else {
-			g.Id("target").Op(":=").Qual(targetStruct.Pack.Path, targetStruct.FullType.StructName + "{}")
+			g.Id("target").Op(":=").Qual(targetStruct.Pack.Path, targetStruct.FullType.StructName+"{}")
 		}
 
 		for sourceFieldName, sourceField := range mapFunc.Mappable[Source].Fields {
@@ -330,12 +330,19 @@ func generateMapFunc(f *jen.File, mapFunc MapFunc) {
 				if _, ok := sourceField.(*Primetive); ok {
 					g.Id("target").Dot(string(sourceFieldName)).Op("=").Id("src").Dot(string(sourceFieldName))
 				} else if sourceStruct, ok := sourceField.(*Struct); ok {
+					hash := string(sourceStruct.Hash()) + string(targetField.(*Struct).Hash())
+					subMethodName, ok := subMappers[hash]
+					if !ok {
+						subMethodName = genRandomName(15)
+						subMappers[hash] = subMethodName
+					}
 					// Если это структура
-					subMethodName := fmt.Sprintf("Map%sTo%s", structNameForNestedMapper(sourceStruct), structNameForNestedMapper(targetField.(*Struct)))
 					g.Id("target").Dot(string(sourceFieldName)).Op("=").Id("m").Dot(subMethodName).Call(jen.Id("src").Dot(string(sourceFieldName)))
 
-					// Генерируем подметод для вложенных структур
-					generateSubMapper(f, subMethodName, sourceStruct, targetField.(*Struct), mapFunc)
+					if !ok {
+						// Генерируем подметод для вложенных структур
+						generateSubMapper(f, subMethodName, sourceStruct, targetField.(*Struct), mapFunc)
+					}
 				}
 			}
 		}
@@ -344,14 +351,9 @@ func generateMapFunc(f *jen.File, mapFunc MapFunc) {
 	})
 }
 
-var subMappers = make(map[string]struct{})
+var subMappers = make(map[string]string)
 
 func generateSubMapper(f *jen.File, methodName string, sourceStruct *Struct, targetStruct *Struct, mapFunc MapFunc) {
-	hash := string(sourceStruct.Hash()) + string(targetStruct.Hash())
-	if _, ok := subMappers[hash]; ok {
-		return
-	}
-	subMappers[hash] = struct{}{}
 	// Основной метод
 	mapF := f.Func().
 		Params(jen.Id("m").Op("*").Id("MapperImpl")).
@@ -372,19 +374,26 @@ func generateSubMapper(f *jen.File, methodName string, sourceStruct *Struct, tar
 		if targetStruct.Pack == thisPack {
 			g.Id("target").Op(":=").Id(targetStruct.FullType.StructName + "{}")
 		} else {
-			g.Id("target").Op(":=").Qual(targetStruct.Pack.Path, targetStruct.FullType.StructName + "{}")
+			g.Id("target").Op(":=").Qual(targetStruct.Pack.Path, targetStruct.FullType.StructName+"{}")
 		}
 
 		for sourceFieldName, sourceField := range sourceStruct.Fields {
 			if targetField, ok := targetStruct.Fields[sourceFieldName]; ok {
 				if _, ok := sourceField.(*Primetive); ok {
 					g.Id("target").Dot(string(sourceFieldName)).Op("=").Id("src").Dot(string(sourceFieldName))
-				} else if nestedSourceStruct, ok := sourceField.(*Struct); ok {					
-					nestedMethodName := fmt.Sprintf("Map%sTo%s", structNameForNestedMapper(nestedSourceStruct), structNameForNestedMapper(targetField.(*Struct)))
-					g.Id("target").Dot(string(sourceFieldName)).Op("=").Id("m").Dot(nestedMethodName).Call(jen.Id("src").Dot(string(sourceFieldName)))
+				} else if nestedSourceStruct, ok := sourceField.(*Struct); ok {
+					hash := string(nestedSourceStruct.Hash()) + string(targetStruct.Hash())
+					methodName, ok := subMappers[hash]
+					if !ok {
+						methodName = genRandomName(15)
+						subMappers[hash] = methodName
+					}
+					g.Id("target").Dot(string(sourceFieldName)).Op("=").Id("m").Dot(methodName).Call(jen.Id("src").Dot(string(sourceFieldName)))
 
-					// Рекурсивно генерируем вложенные подметоды
-					generateSubMapper(f, nestedMethodName, nestedSourceStruct, targetField.(*Struct), mapFunc)
+					if !ok {
+						// Рекурсивно генерируем вложенные подметоды
+						generateSubMapper(f, methodName, nestedSourceStruct, targetField.(*Struct), mapFunc)
+					}
 				}
 			}
 		}
@@ -393,11 +402,18 @@ func generateSubMapper(f *jen.File, methodName string, sourceStruct *Struct, tar
 	})
 }
 
-func structNameForNestedMapper(s *Struct) string {
-	caser := cases.Title(language.English)
-	if s.FullType.ShortPackName != "" {
-		return caser.String(s.FullType.ShortPackName) + caser.String(s.FullType.StructName)
-	}
+const charset = "abcdefghijklmnopqrstuvwxyz"
 
-	return s.FullType.StructName
+func genRandomName(length int) string {
+	seed := time.Now().UnixNano()
+
+	src := rand.NewPCG(uint64(seed), uint64(seed>>32))
+	r := rand.New(src)
+
+	// Буфер для сборки строки
+	result := make([]byte, length)
+	for i := range result {
+		result[i] = charset[r.IntN(len(charset))]
+	}
+	return string(result)
 }
