@@ -9,6 +9,7 @@ type Person struct {
 	Age int64
 	Account external.Account
 	Profile Profile
+	Projects []string
 }
 
 type Profile struct {

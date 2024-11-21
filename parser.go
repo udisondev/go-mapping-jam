@@ -57,11 +57,6 @@ func parse(filePath string) map[string]MapFunc {
 		}
 	}
 
-	// mapFuncs := make([]mapper, 0, len(node.Scope.Objects))
-
-	// Ищем интерфейс Mapper и метод
-
-	// Загружаем пакеты проекта
 	cfg := &packages.Config{
 		Mode: packages.NeedTypes | packages.NeedImports | packages.NeedSyntax,
 		Fset: fset,
@@ -119,31 +114,29 @@ func (m *MapFunc) initRoot(str *Struct, packFunc func(dir string) *packages.Pack
 }
 
 func (m *MapFunc) buildField(owner *Struct, field *types.Var) StructField {
-	// Проверяем, является ли поле встроенным типом
-	if basicType, ok := field.Type().(*types.Basic); ok {
-		return &Primetive{
-			Type: basicType.Name(),
-		}
-	}
 
-	// Проверяем, является ли поле структурой
-	if namedType, ok := field.Type().(*types.Named); ok {
-		structType, ok := namedType.Underlying().(*types.Struct)
+	switch t := field.Type().(type) {
+	case *types.Basic:
+		return &Primetive{
+			Type: t.Name(),
+		}
+	case *types.Named: 
+		structType, ok := t.Underlying().(*types.Struct)
 		if !ok {
 			// Если это не структура, возвращаем как примитив
 			return &Primetive{
-				Type: namedType.Obj().Name(),
+				Type: t.Obj().Name(),
 			}
 		}
 
 		// Создаем структуру для вложенного типа
-		pack := Pack{Path: namedType.Obj().Pkg().Path()}
+		pack := Pack{Path: t.Obj().Pkg().Path()}
 		fs := &Struct{
 			Owner: owner,
 			Pack:  &pack,
 			FullType: FullType{
-				ShortPackName: namedType.Obj().Pkg().Name(),
-				StructName:    namedType.Obj().Name(),
+				ShortPackName: t.Obj().Pkg().Name(),
+				StructName:    t.Obj().Name(),
 			},
 			Fields: make(map[FieldName]StructField),
 		}
@@ -156,6 +149,12 @@ func (m *MapFunc) buildField(owner *Struct, field *types.Var) StructField {
 		}
 
 		return fs
+
+	case *types.Slice: 
+		b, ok := t.Elem().Underlying().(*types.Basic)
+		if ok {
+			return &PrimetiveSlice{Type: b.Name()}
+		}
 	}
 
 	// Если тип неизвестен, возвращаем nil

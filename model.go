@@ -28,12 +28,22 @@ type StructField interface {
 
 func (s *Struct) isField()    {}
 func (p *Primetive) isField() {}
+func (p *StructSlice) isField() {}
+func (p *PrimetiveSlice) isField() {}
 
 type Struct struct {
 	Owner    *Struct
 	Pack     *Pack
 	FullType FullType
 	Fields   map[FieldName]StructField
+}
+
+type StructSlice struct {
+	Struct *Struct
+}
+
+type PrimetiveSlice struct {
+	Type string
 }
 
 type Primetive struct {
@@ -81,7 +91,6 @@ type MapFunc struct {
 	Rules    map[RuleType]Rule
 }
 
-
 func (s Struct) Hash() string {
 	return s.Pack.Path + "." + s.FullType.StructName
 }
@@ -93,4 +102,3 @@ func (p Pack) Dir() string {
 func (p Pack) Name() string {
 	return p.Alias
 }
-
