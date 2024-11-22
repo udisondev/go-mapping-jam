@@ -2,7 +2,7 @@ package main
 
 const projectName = "github.com/udisondev/go-mapping-jam"
 
-var thisPack = &Pack{Alias: "", Path: projectName + "/mapping"}
+var currentPath =  projectName + "/mapping"
 
 func main() {
 	registerRuleParser("qual", parseQualRule)

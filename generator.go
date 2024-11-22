@@ -29,45 +29,47 @@ func generateCodeWithJennifer(outputFile string, mapFuncs map[string]MapFunc) {
 }
 
 func generateMapFunc(f *jen.File, mapFunc MapFunc) {
-	sourceStruct := mapFunc.Mappable[Source]
-	targetStruct := mapFunc.Mappable[Target]
+	sourceStruct := mapFunc.Source
+	targetStruct := mapFunc.Target
 
 	// Основной метод
 	mapF := f.Func().
 		Params(jen.Id("m").Op("*").Id("MapperImpl")).
 		Id(mapFunc.Name)
-	if sourceStruct.Pack == thisPack {
-		mapF.Params(jen.Id("src").Id(sourceStruct.FullType.StructName))
+	if sourceStruct.Path == currentPath {
+		mapF.Params(jen.Id("src").Id(sourceStruct.Name))
 	} else {
-		mapF.Params(jen.Id("src").Qual(sourceStruct.Pack.Path, sourceStruct.FullType.StructName))
+		mapF.Params(jen.Id("src").Qual(sourceStruct.Path, sourceStruct.Name))
 	}
 
-	if targetStruct.Pack == thisPack {
-		mapF.Id(targetStruct.FullType.StructName)
+	if targetStruct.Path == currentPath {
+		mapF.Id(targetStruct.Name)
 	} else {
-		mapF.Qual(targetStruct.Pack.Path, targetStruct.FullType.StructName)
+		mapF.Qual(targetStruct.Path, targetStruct.Name)
 	}
 
 	mapF.BlockFunc(func(g *jen.Group) {
-		if targetStruct.Pack == thisPack {
-			g.Id("target").Op(":=").Id(targetStruct.FullType.StructName + "{}")
+		if targetStruct.Path == currentPath {
+			g.Id("target").Op(":=").Id(targetStruct.Name + "{}")
 		} else {
-			g.Id("target").Op(":=").Qual(targetStruct.Pack.Path, targetStruct.FullType.StructName+"{}")
+			g.Id("target").Op(":=").Qual(targetStruct.Path, targetStruct.Name+"{}")
 		}
 
-		for targetFieldName, targetField := range mapFunc.Mappable[Target].Fields {
-			qual := mapFunc.Rules[Qual]
+		for targetFieldName, targetField := range mapFunc.Target.Fields {
+			quals := mapFunc.Rules[Qual]
 			sourceFieldName := targetFieldName
-			if q, ok := qual.(QualRule); ok && q.TargetName == targetFieldName {
-				sourceFieldName = q.SourceName
+			for _, q := range quals {
+				if q, ok := q.(QualRule); ok && q.TargetName == targetField.FullName() {
+					sourceFieldName = q.SourceName
+				}	
 			}
-
-			if sourceField, ok := mapFunc.Mappable[Source].Fields[sourceFieldName]; ok {
+			
+			if sourceField, ok := mapFunc.Source.Fields[sourceFieldName]; ok {
 				// Если это примитивное поле
-				if _, ok := targetField.(*Primetive); ok {
+				if _, ok := targetField.Desc.(*Primetive); ok {
 					g.Id("target").Dot(string(targetFieldName)).Op("=").Id("src").Dot(string(sourceFieldName))
-				} else if targetStruct, ok := targetField.(*Struct); ok {
-					hash := string(targetStruct.Hash()) + string(sourceField.(*Struct).Hash())
+				} else if targetStruct, ok := targetField.Desc.(*Struct); ok {
+					hash := string(targetStruct.Hash()) + string(sourceField.Desc.(*Struct).Hash())
 					subMethodName, ok := subMappers[hash]
 					if !ok {
 						subMethodName = genRandomName(15)
@@ -78,7 +80,7 @@ func generateMapFunc(f *jen.File, mapFunc MapFunc) {
 
 					if !ok {
 						// Генерируем подметод для вложенных структур
-						generateSubMapper(f, subMethodName, sourceField.(*Struct), targetStruct, mapFunc)
+						generateSubMapper(f, subMethodName, sourceField.Desc.(*Struct), targetStruct, mapFunc)
 					}
 				}
 			}
@@ -95,37 +97,40 @@ func generateSubMapper(f *jen.File, methodName string, sourceStruct *Struct, tar
 	mapF := f.Func().
 		Params(jen.Id("m").Op("*").Id("MapperImpl")).
 		Id(methodName)
-	if sourceStruct.Pack == thisPack {
-		mapF.Params(jen.Id("src").Id(sourceStruct.FullType.StructName))
+	if sourceStruct.Path == currentPath {
+		mapF.Params(jen.Id("src").Id(sourceStruct.Name))
 	} else {
-		mapF.Params(jen.Id("src").Qual(sourceStruct.Pack.Path, sourceStruct.FullType.StructName))
+		mapF.Params(jen.Id("src").Qual(sourceStruct.Path, sourceStruct.Name))
 	}
 
-	if targetStruct.Pack == thisPack {
-		mapF.Id(targetStruct.FullType.StructName)
+	if targetStruct.Path == currentPath {
+		mapF.Id(targetStruct.Name)
 	} else {
-		mapF.Qual(targetStruct.Pack.Path, targetStruct.FullType.StructName)
+		mapF.Qual(targetStruct.Path, targetStruct.Name)
 	}
 
 	mapF.BlockFunc(func(g *jen.Group) {
-		if targetStruct.Pack == thisPack {
-			g.Id("target").Op(":=").Id(targetStruct.FullType.StructName + "{}")
+		if targetStruct.Path == currentPath {
+			g.Id("target").Op(":=").Id(targetStruct.Name + "{}")
 		} else {
-			g.Id("target").Op(":=").Qual(targetStruct.Pack.Path, targetStruct.FullType.StructName+"{}")
+			g.Id("target").Op(":=").Qual(targetStruct.Path, targetStruct.Name+"{}")
 		}
 
 		for targetFieldName, targetField := range targetStruct.Fields {
-			qual := mapFunc.Rules[Qual]
+			quals := mapFunc.Rules[Qual]
 			sourceFieldName := targetFieldName
-			if q, ok := qual.(QualRule); ok && q.TargetName == targetFieldName {
-				sourceFieldName = q.SourceName
+			for _, q := range quals {
+				log.Printf("target full name: %s", targetField.FullName())
+				if q, ok := q.(QualRule); ok && q.TargetName == targetField.FullName() {
+					sourceFieldName = q.SourceName
+				}	
 			}
 
 			if sourceField, ok := sourceStruct.Fields[sourceFieldName]; ok {
-				if _, ok := sourceField.(*Primetive); ok {
+				if _, ok := sourceField.Desc.(*Primetive); ok {
 					g.Id("target").Dot(string(targetFieldName)).Op("=").Id("src").Dot(string(sourceFieldName))
-				} else if nestedSourceStruct, ok := sourceField.(*Struct); ok {
-					hash := string(nestedSourceStruct.Hash()) + string(targetField.(*Struct).Hash())
+				} else if nestedSourceStruct, ok := sourceField.Desc.(*Struct); ok {
+					hash := string(nestedSourceStruct.Hash()) + string(targetField.Desc.(*Struct).Hash())
 					methodName, ok := subMappers[hash]
 					if !ok {
 						methodName = genRandomName(15)
@@ -135,7 +140,7 @@ func generateSubMapper(f *jen.File, methodName string, sourceStruct *Struct, tar
 
 					if !ok {
 						// Рекурсивно генерируем вложенные подметоды
-						generateSubMapper(f, methodName, nestedSourceStruct, targetField.(*Struct), mapFunc)
+						generateSubMapper(f, methodName, nestedSourceStruct, targetField.Desc.(*Struct), mapFunc)
 					}
 				}
 			}

@@ -13,6 +13,6 @@ type Person struct {
 }
 
 type Profile struct {
-	Phone string
+	Number string
 }
 

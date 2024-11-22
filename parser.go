@@ -6,6 +6,7 @@ import (
 	"go/token"
 	"go/types"
 	"log"
+	"path/filepath"
 	"regexp"
 	"strings"
 
@@ -22,39 +23,35 @@ func parse(filePath string) map[string]MapFunc {
 		log.Fatalf("failed to parse file: %v", err)
 	}
 
-	imports := make(map[string]*Pack)
-	initImports := make(map[string]*Pack)
-	mapFuncs := make(map[string]MapFunc)
+	mapperImports := make([]struct{ alias, path string }, 0, len(node.Imports))
 	for _, v := range node.Imports {
-		imp := extractMapImport(v)
-		imports[imp.Path] = &imp
-		initImports[imp.Alias] = &imp
+		mapperImports = append(mapperImports, extractMapImport(v))
 	}
 
-	astMethods := extractMethods(node)
-
-	for _, v := range astMethods {
-		mappingRules := make(map[RuleType]Rule)
+	for _, v := range extractMethods(node) {
+		mappingRules := make(map[RuleType][]Rule)
 		if v.Doc != nil {
 			for _, mpr := range v.Doc.List {
 				rules := parseRules(strings.TrimSpace(strings.ReplaceAll(mpr.Text, "//", "")))
 				for _, r := range rules {
-					mappingRules[r.Type()] = r
+					mappingRules[r.Type()] = append(mappingRules[r.Type()], r)
 				}
 			}
 		}
 
 		if fType, ok := v.Type.(*ast.FuncType); ok {
-			source := extractMappingRoot(fType.Params, initImports)
-			target := extractMappingRoot(fType.Results, initImports)
+			source := extractMappingRoot(fType.Params, mapperImports)
+			target := extractMappingRoot(fType.Results, mapperImports)
 			m := MapFunc{
-				Name:     v.Names[0].Name,
-				Mappable: map[Direction]*Struct{Source: &source, Target: &target},
-				Rules:    mappingRules,
+				Name:   v.Names[0].Name,
+				Source: &source,
+				Target: &target,
+				Rules: mappingRules,
 			}
 
-			mapFuncs[m.Name] = m
+			mappersMap[m.Name] = m
 		}
+
 	}
 
 	cfg := &packages.Config{
@@ -62,7 +59,7 @@ func parse(filePath string) map[string]MapFunc {
 		Fset: fset,
 	}
 
-	for _, v := range mapFuncs {
+	for _, v := range mappersMap {
 		packFunc := func(dir string) *packages.Package {
 			pks, err := packages.Load(cfg, dir)
 			if err != nil {
@@ -71,97 +68,106 @@ func parse(filePath string) map[string]MapFunc {
 			return pks[0]
 		}
 
-		v.initRoot(v.Mappable[Source], packFunc)
-		v.initRoot(v.Mappable[Target], packFunc)
+		v.initRoot(v.Source, packFunc)
+		v.initRoot(v.Target, packFunc)
 	}
 
-	return mapFuncs
+	return mappersMap
 }
-
 
 func (m *MapFunc) initRoot(str *Struct, packFunc func(dir string) *packages.Package) {
 	// Загружаем пакет
-	pkg, ok := pkgs[str.Pack.Path]
+	pkg, ok := pkgs[str.Path]
 	if !ok {
-		pkg = packFunc(string(str.Pack.Dir()))
-		pkgs[str.Pack.Path] = pkg
+		pkg = packFunc(dirByPath(str.Path))
+		pkgs[str.Path] = pkg
 	}
 
 	// Находим тип в пакете
-	obj := pkg.Types.Scope().Lookup(str.FullType.StructName)
+	obj := pkg.Types.Scope().Lookup(str.Name)
 	if obj == nil {
-		log.Fatalf("type %s not found in package %s", str.FullType.StructName, str.Pack)
+		log.Fatalf("type %s not found in package %s", str.Name, str.Path)
 	}
 
 	// Проверяем, является ли это именованным типом
 	namedType, ok := obj.Type().(*types.Named)
 	if !ok {
-		log.Fatalf("%s is not a named type", str.FullType.StructName)
+		log.Fatalf("%s is not a named type", str.Name)
 	}
 
 	// Проверяем, является ли это структурой
 	structType, ok := namedType.Underlying().(*types.Struct)
 	if !ok {
-		log.Fatalf("%s is not a struct", str.FullType.StructName)
+		log.Fatalf("%s is not a struct", str.Name)
 	}
 
 	// Обрабатываем поля структуры
 	for i := 0; i < structType.NumFields(); i++ {
 		field := structType.Field(i)
-		fieldName := FieldName(field.Name())
-		str.Fields[fieldName] = m.buildField(str, field)
+		fieldName := field.Name()
+		str.Fields[fieldName] = m.buildField(nil, fieldName, field)
 	}
 }
 
-func (m *MapFunc) buildField(owner *Struct, field *types.Var) StructField {
+func dirByPath(p string) string {
+	return strings.ReplaceAll(p, projectName, "./")
+}
 
+func (m *MapFunc) buildField(owner *Field, fieldName string, field *types.Var) *Field {
 	switch t := field.Type().(type) {
 	case *types.Basic:
-		return &Primetive{
-			Type: t.Name(),
-		}
-	case *types.Named: 
+		return &Field{
+			Owner: owner,
+			Name:  fieldName,
+			Desc: &Primetive{
+				Type: t.Name(),
+			}}
+	case *types.Named:
 		structType, ok := t.Underlying().(*types.Struct)
 		if !ok {
 			// Если это не структура, возвращаем как примитив
-			return &Primetive{
-				Type: t.Obj().Name(),
+			return &Field{
+				Owner: owner,
+				Name:  fieldName,
+				Desc: &Primetive{
+					Type: t.Obj().Name(),
+				},
 			}
 		}
 
-		// Создаем структуру для вложенного типа
-		pack := Pack{Path: t.Obj().Pkg().Path()}
-		fs := &Struct{
+		fs := &Field{
 			Owner: owner,
-			Pack:  &pack,
-			FullType: FullType{
-				ShortPackName: t.Obj().Pkg().Name(),
-				StructName:    t.Obj().Name(),
-			},
-			Fields: make(map[FieldName]StructField),
-		}
+			Name:  fieldName,
+			Desc: &Struct{
+				Path:   t.Obj().Pkg().Path(),
+				Name:   t.Obj().Name(),
+				Fields: make(map[string]*Field),
+			}}
 
 		// Рекурсивно обрабатываем поля структуры
 		for i := 0; i < structType.NumFields(); i++ {
 			subField := structType.Field(i)
-			subFieldName := FieldName(subField.Name())
-			fs.Fields[subFieldName] = m.buildField(fs, subField)
+			subFieldName := subField.Name()
+			fs.Desc.(*Struct).Fields[subFieldName] = m.buildField(fs, subFieldName, subField)
 		}
 
 		return fs
 
-	case *types.Slice: 
+	case *types.Slice:
 		b, ok := t.Elem().Underlying().(*types.Basic)
 		if ok {
-			return &PrimetiveSlice{Type: b.Name()}
+			return &Field{
+				Owner: owner,
+				Name:  fieldName,
+				Desc: &PrimetiveSlice{Primetive: Primetive{
+					Type: b.Name(),
+				}}}
 		}
 	}
 
-	// Если тип неизвестен, возвращаем nil
 	log.Fatalf("unknown field type: %v", field.Type())
 	return nil
 }
-
 
 func parseRules(input string) []Rule {
 	var rules []Rule
@@ -195,13 +201,14 @@ func parseRules(input string) []Rule {
 func parseQualRule(data string) Rule {
 	// Используем регэксп для извлечения данных
 	re := regexp.MustCompile(`source="([^"]+)"\s+target="([^"]+)"`)
+	
 	matches := re.FindStringSubmatch(data)
 	if len(matches) != 3 {
 		log.Fatalf("invalid qual format: %s", data)
 	}
 	return QualRule{
-		SourceName: FieldName(matches[1]),
-		TargetName: FieldName(matches[2]),
+		SourceName: matches[1],
+		TargetName: matches[2],
 	}
 }
 
@@ -220,7 +227,6 @@ func parseEnumRule(data string) Rule {
 	return EnumRule{EnumMapping: enumMap}
 }
 
-
 func extractMethods(n ast.Node) []*ast.Field {
 	out := []*ast.Field{}
 	ast.Inspect(n, func(n ast.Node) bool {
@@ -235,35 +241,41 @@ func extractMethods(n ast.Node) []*ast.Field {
 	return out
 }
 
-func extractMappingRoot(v *ast.FieldList, impMap map[string]*Pack) Struct {
-	out := Struct{Fields: make(map[FieldName]StructField)}
+func extractMappingRoot(v *ast.FieldList, imports []struct{ alias, path string }) Struct {
+	pathByName := func(n string) string {
+		for _, v := range imports {
+			if v.alias == n {
+				return v.path
+			}
+		}
+		return currentPath
+	}
+
+	out := Struct{Fields: make(map[string]*Field)}
 	switch expr := v.List[0].Type.(type) {
 	case *ast.Ident:
-		out.FullType = FullType{StructName: expr.Name}
-		out.Pack = thisPack
+		out.Path = currentPath
+		out.Name = expr.Name
 	case *ast.SelectorExpr:
-		pack := impMap[expr.X.(*ast.Ident).Name]
-		out.FullType = FullType{ShortPackName: expr.X.(*ast.Ident).Name, StructName: expr.Sel.Name}
-		out.Pack = pack
+		out.Path = pathByName(expr.X.(*ast.Ident).Name)
+		out.Name = expr.Sel.Name
 	}
 
 	return out
 }
 
-
-func extractMapImport(i *ast.ImportSpec) Pack {
-	out := Pack{}
-	path := strings.ReplaceAll(i.Path.Value, "\"", "")
-	out.Path = path
+func extractMapImport(i *ast.ImportSpec) struct{ alias, path string } {
+	var alias, path string
+	path = strings.ReplaceAll(i.Path.Value, "\"", "")
 
 	if i.Name != nil {
-		out.Alias = i.Name.Name
-		return out
+		alias = i.Name.Name
+	} else {
+		alias = filepath.Base(path)
 	}
 
-	pathElements := strings.Split(path, "/")
-	lastPathElement := pathElements[len(pathElements)-1]
-	out.Alias = lastPathElement
-
-	return out
+	return struct {
+		alias string
+		path  string
+	}{alias: alias, path: path}
 }

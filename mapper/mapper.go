@@ -8,7 +8,11 @@ import (
 
 
 type Mapper interface {
-	//qual={source="Firstname" target="FirstName"}
+	//@qual={source="Firstname" target=".FirstName"}
+	//@qual={source="Number" target=".Profile.Phone"}
     MapPersonToDTO(p domain.Person) d.Person
+
+	//@qual={source="Firstname" target=".FirstName"}
+	//@qual={source="Number" target=".Profile.Phone"}
     MapPersonToDomain(p d.Person) domain.Person
 }
