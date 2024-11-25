@@ -16,7 +16,6 @@ import (
 var pkgs = make(map[string]*packages.Package)
 
 func parse(filePath string) map[string]MapFunc {
-	// Читаем исходный код
 	fset := token.NewFileSet()
 	node, err := parser.ParseFile(fset, filePath, nil, parser.ParseComments)
 	if err != nil {
@@ -76,32 +75,27 @@ func parse(filePath string) map[string]MapFunc {
 }
 
 func (m *MapFunc) initRoot(str *Struct, packFunc func(dir string) *packages.Package) {
-	// Загружаем пакет
 	pkg, ok := pkgs[str.Path]
 	if !ok {
 		pkg = packFunc(dirByPath(str.Path))
 		pkgs[str.Path] = pkg
 	}
 
-	// Находим тип в пакете
 	obj := pkg.Types.Scope().Lookup(str.Name)
 	if obj == nil {
 		log.Fatalf("type %s not found in package %s", str.Name, str.Path)
 	}
 
-	// Проверяем, является ли это именованным типом
 	namedType, ok := obj.Type().(*types.Named)
 	if !ok {
 		log.Fatalf("%s is not a named type", str.Name)
 	}
 
-	// Проверяем, является ли это структурой
 	structType, ok := namedType.Underlying().(*types.Struct)
 	if !ok {
 		log.Fatalf("%s is not a struct", str.Name)
 	}
 
-	// Обрабатываем поля структуры
 	for i := 0; i < structType.NumFields(); i++ {
 		field := structType.Field(i)
 		fieldName := field.Name()
@@ -125,7 +119,6 @@ func (m *MapFunc) buildField(owner *Field, fieldName string, field *types.Var) *
 	case *types.Named:
 		structType, ok := t.Underlying().(*types.Struct)
 		if !ok {
-			// Если это не структура, возвращаем как примитив
 			return &Field{
 				Owner: owner,
 				Name:  fieldName,
@@ -144,7 +137,6 @@ func (m *MapFunc) buildField(owner *Field, fieldName string, field *types.Var) *
 				Fields: make(map[string]*Field),
 			}}
 
-		// Рекурсивно обрабатываем поля структуры
 		for i := 0; i < structType.NumFields(); i++ {
 			subField := structType.Field(i)
 			subFieldName := subField.Name()
@@ -172,7 +164,6 @@ func (m *MapFunc) buildField(owner *Field, fieldName string, field *types.Var) *
 func parseRules(input string) []Rule {
 	var rules []Rule
 
-	// Регэксп для поиска блоков типа `qual={...}` или `enum={...}`
 	re := regexp.MustCompile(`(\w+)={(.*?)}`)
 	matches := re.FindAllStringSubmatch(input, -1)
 
@@ -183,13 +174,11 @@ func parseRules(input string) []Rule {
 		ruleType := match[1]
 		ruleData := match[2]
 
-		// Проверяем, зарегистрирован ли парсер для типа
 		parser, ok := ruleParsers[ruleType]
 		if !ok {
 			log.Fatalf("unknown rule type: %s", ruleType)
 		}
 
-		// Парсим правило
 		rule := parser(ruleData)
 		rules = append(rules, rule)
 	}
@@ -197,9 +186,7 @@ func parseRules(input string) []Rule {
 	return rules
 }
 
-// Парсер для QualRule
 func parseQualRule(data string) Rule {
-	// Используем регэксп для извлечения данных
 	resource := regexp.MustCompile(`source="([^"]+)"`)
 	retarget := regexp.MustCompile(`target="([^"]+)"`)
 	remname := regexp.MustCompile(`mname="([^"]+)"`)
@@ -238,9 +225,7 @@ func parseQualRule(data string) Rule {
 	}
 }
 
-// Парсер для EnumRule
 func parseEnumRule(data string) Rule {
-	// Используем регэксп для извлечения пар ключ=значение
 	re := regexp.MustCompile(`(\w+)=([\w]+)`)
 	matches := re.FindAllStringSubmatch(data, -1)
 	if matches == nil {
