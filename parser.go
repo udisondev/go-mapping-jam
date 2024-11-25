@@ -200,15 +200,41 @@ func parseRules(input string) []Rule {
 // Парсер для QualRule
 func parseQualRule(data string) Rule {
 	// Используем регэксп для извлечения данных
-	re := regexp.MustCompile(`source="([^"]+)"\s+target="([^"]+)"`)
+	resource := regexp.MustCompile(`source="([^"]+)"`)
+	retarget := regexp.MustCompile(`target="([^"]+)"`)
+	remname := regexp.MustCompile(`mname="([^"]+)"`)
 	
-	matches := re.FindStringSubmatch(data)
-	if len(matches) != 3 {
+	smatches := resource.FindStringSubmatch(data)
+	if len(smatches) != 2 {
 		log.Fatalf("invalid qual format: %s", data)
 	}
+
+	tmatches := retarget.FindStringSubmatch(data)
+	if len(tmatches) != 2 {
+		log.Fatalf("invalid qual format: %s", data)
+	}
+
+	source, target := smatches[1], tmatches[1]
+	targetPath := strings.Split(target, ".")
+	sourcePath := make([]string, len(targetPath))
+	if strings.HasPrefix(source, ".") {
+		sourcePath = strings.Split(source, ".")
+	}
+
+	if len(targetPath) != len(sourcePath) {
+		log.Fatalf("source path must contain the same count of path elements as the target: check rule: @qual={%s}", data)
+	}
+
+	var methodName string
+	mnmatches := remname.FindStringSubmatch(data)
+	if len(mnmatches) == 2 {
+		methodName = mnmatches[1]
+	}
+
 	return QualRule{
-		SourceName: matches[1],
-		TargetName: matches[2],
+		SourceName: source,
+		TargetName: target,
+		MethodName: methodName,
 	}
 }
 

@@ -3,7 +3,7 @@ package main
 type QualRule struct {
 	SourceName       string
 	TargetName       string
-	CustomMethodName string
+	MethodName string
 }
 
 type EnumRule struct {
