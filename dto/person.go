@@ -6,7 +6,7 @@ type Person struct {
 	FirstName string
 	LastName string
 	MiddleName string
-	Age int64
+	Age int
 	Account external.Account
 	Profile Profile
 	Projects []string

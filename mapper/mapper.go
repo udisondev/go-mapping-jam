@@ -1,4 +1,3 @@
-//go:generate go run generate.go
 package mapper
 
 import (
@@ -19,18 +18,18 @@ import (
 // TODO expr
 type Mapper interface {
 
-	//@qual={source="Firstname" target=".FirstName" mname="firstNameMapper"}
+	//@qual={source="Firstname" target=".FirstName" mname="FirstNameMapper" mpath="github.com/udisondev/go-mapping-jam/domain"}
+	//@qual={target=".LastName" mname="lastNameMapper"}
+	//@qual={target=".Age" mname="int"}
 	//@qual={source="Number" target=".Profile.Phone"}
-	//@err(source="Firstname" target=".FirstName" errf="")
 	MapPersonToDTO(p domain.Person) (d.Person, error)
 
 	//@qual={source="Firstname" target=".FirstName"}
-	//@qual={source=".Prof.Phone" target=".Profile.Number"}
-	//@qual={source="Prof" target=".Profile"}
+	//@qual={source="Phone" target=".Profile.Number"}
+	//@qual={target=".Age" mname="int64"}
 	MapPersonToDomain(p d.Person) domain.Person
 }
 
-func firstNameMapper(firstName string) string {
-	return strings.ToUpper(firstName)
+func lastNameMapper(lastName string) string {
+	return strings.ToLower(lastName)
 }
-

@@ -45,7 +45,7 @@ func parse(filePath string) map[string]MapFunc {
 				Name:   v.Names[0].Name,
 				Source: &source,
 				Target: &target,
-				Rules: mappingRules,
+				Rules:  mappingRules,
 			}
 
 			mappersMap[m.Name] = m
@@ -190,10 +190,12 @@ func parseQualRule(data string) Rule {
 	resource := regexp.MustCompile(`source="([^"]+)"`)
 	retarget := regexp.MustCompile(`target="([^"]+)"`)
 	remname := regexp.MustCompile(`mname="([^"]+)"`)
-	
+	rempath := regexp.MustCompile(`mpath="([^"]+)"`)
+
+	var source, mname, mpath string
 	smatches := resource.FindStringSubmatch(data)
-	if len(smatches) != 2 {
-		log.Fatalf("invalid qual format: %s", data)
+	if len(smatches) == 2 {
+		source = smatches[1]
 	}
 
 	tmatches := retarget.FindStringSubmatch(data)
@@ -201,7 +203,7 @@ func parseQualRule(data string) Rule {
 		log.Fatalf("invalid qual format: %s", data)
 	}
 
-	source, target := smatches[1], tmatches[1]
+	target := tmatches[1]
 	targetPath := strings.Split(target, ".")
 	sourcePath := make([]string, len(targetPath))
 	if strings.HasPrefix(source, ".") {
@@ -212,16 +214,21 @@ func parseQualRule(data string) Rule {
 		log.Fatalf("source path must contain the same count of path elements as the target: check rule: @qual={%s}", data)
 	}
 
-	var methodName string
-	mnmatches := remname.FindStringSubmatch(data)
-	if len(mnmatches) == 2 {
-		methodName = mnmatches[1]
+	custmnamedata := remname.FindStringSubmatch(data)
+	if len(custmnamedata) == 2 {
+		mname = custmnamedata[1]
+	}
+
+	custmnpathdata := rempath.FindStringSubmatch(data)
+	if len(custmnpathdata) == 2 {
+		mpath = custmnpathdata[1]
 	}
 
 	return QualRule{
 		SourceName: source,
 		TargetName: target,
-		MethodName: methodName,
+		MName: mname,
+		MPath: mpath,
 	}
 }
 

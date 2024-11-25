@@ -1,9 +1,13 @@
 package main
 
 type QualRule struct {
-	SourceName       string
-	TargetName       string
-	MethodName string
+	SourceName string
+	TargetName string
+	MPath      string
+	MName      string
+}
+
+type CustomMapper struct {
 }
 
 type EnumRule struct {
@@ -31,4 +35,3 @@ var ruleParsers = map[string]RuleFactory{}
 func registerRuleParser(name string, factory RuleFactory) {
 	ruleParsers[name] = factory
 }
-
