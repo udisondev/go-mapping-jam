@@ -24,13 +24,10 @@ type Rule interface {
 func (nr QualRule) Type() RuleType { return Qual }
 func (er EnumRule) Type() RuleType { return Enum }
 
-// Фабрики для правил
 type RuleFactory func(string) Rule
 
-// Глобальная карта парсеров
 var ruleParsers = map[string]RuleFactory{}
 
-// Регистрация парсеров
 func registerRuleParser(name string, factory RuleFactory) {
 	ruleParsers[name] = factory
 }
