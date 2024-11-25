@@ -66,24 +66,26 @@ func genMap(f *jen.File, methodName string, sourceStruct *Struct, targetStruct *
 			if sourceField, ok := sourceStruct.Fields[sourceFieldName]; ok {
 				if mname != "" {
 					if mpath != "" {
-						g.Id("target").Dot(string(targetFieldName)).Op("=").Qual(mpath, mname).Call(jen.Id("src").Dot(sourceFieldName))
+						g.Id("target").Dot(targetFieldName).Op("=").Qual(mpath, mname).Call(jen.Id("src").Dot(sourceFieldName))
 					} else {
-						g.Id("target").Dot(string(targetFieldName)).Op("=").Id(mname).Call(jen.Id("src").Dot(sourceFieldName))
+						g.Id("target").Dot(targetFieldName).Op("=").Id(mname).Call(jen.Id("src").Dot(sourceFieldName))
 					}
 				} else if _, ok := sourceField.Desc.(*Primetive); ok {
-					g.Id("target").Dot(string(targetFieldName)).Op("=").Id("src").Dot(string(sourceFieldName))
+					g.Id("target").Dot(targetFieldName).Op("=").Id("src").Dot(sourceFieldName)
 				} else if nestedSourceStruct, ok := sourceField.Desc.(*Struct); ok {
-					hash := string(nestedSourceStruct.Hash()) + string(targetField.Desc.(*Struct).Hash())
+					hash := nestedSourceStruct.Hash() + targetField.Desc.(*Struct).Hash()
 					methodName, ok := mappers[hash]
 					if !ok {
 						methodName = genRandomName(15)
 						mappers[hash] = methodName
 					}
-					g.Id("target").Dot(string(targetFieldName)).Op("=").Id(methodName).Call(jen.Id("src").Dot(string(sourceFieldName)))
+					g.Id("target").Dot(targetFieldName).Op("=").Id(methodName).Call(jen.Id("src").Dot(sourceFieldName))
 
 					if !ok {
 						genMap(f, methodName, nestedSourceStruct, targetField.Desc.(*Struct), mapFunc)
 					}
+				} else if _, ok := sourceField.Desc.(*PrimetiveSlice); ok {
+					g.Id("target").Dot(targetFieldName).Op("=").Id("src").Dot(sourceFieldName)
 				}
 			}
 		}
