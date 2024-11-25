@@ -10,6 +10,6 @@ func main() {
 
 	mapFuncs := parse("./mapper/mapper.go")
 	
-	outputFile := "mapper_impl.go"
+	outputFile := "./mapper/mapper_impl.go"
 	generateCodeWithJennifer(outputFile, mapFuncs)
 }
