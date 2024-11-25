@@ -16,7 +16,7 @@ func generateCodeWithJennifer(outputFile string, mapFuncs map[string]MapFunc) {
 	f.Type().Id("MapperImpl").Struct()
 
 	for _, mapFunc := range mapFuncs {
-		generateMapFunc(f, mapFunc)
+		genMap(f, mapFunc.Name, mapFunc.Source, mapFunc.Target, mapFunc)
 	}
 
 	err := f.Save(outputFile)
@@ -25,73 +25,9 @@ func generateCodeWithJennifer(outputFile string, mapFuncs map[string]MapFunc) {
 	}
 }
 
-func generateMapFunc(f *jen.File, mapFunc MapFunc) {
-	sourceStruct := mapFunc.Source
-	targetStruct := mapFunc.Target
+var mappers = make(map[string]string)
 
-	mapF := f.Func().
-		Params(jen.Id("m").Op("*").Id("MapperImpl")).
-		Id(mapFunc.Name)
-	if sourceStruct.Path == currentPath {
-		mapF.Params(jen.Id("src").Id(sourceStruct.Name))
-	} else {
-		mapF.Params(jen.Id("src").Qual(sourceStruct.Path, sourceStruct.Name))
-	}
-
-	if targetStruct.Path == currentPath {
-		mapF.Id(targetStruct.Name)
-	} else {
-		mapF.Qual(targetStruct.Path, targetStruct.Name)
-	}
-
-	mapF.BlockFunc(func(g *jen.Group) {
-		if targetStruct.Path == currentPath {
-			g.Id("target").Op(":=").Id(targetStruct.Name + "{}")
-		} else {
-			g.Id("target").Op(":=").Qual(targetStruct.Path, targetStruct.Name+"{}")
-		}
-
-		for targetFieldName, targetField := range mapFunc.Target.Fields {
-			quals := mapFunc.Rules[Qual]
-			sourceFieldName := targetFieldName
-			var mname string
-			for _, q := range quals {
-				if q, ok := q.(QualRule); ok && q.TargetName == targetField.FullName() {
-					sourceFieldName = q.SourceName
-					if q.MethodName != "" {
-						mname = q.MethodName
-					}
-				}	
-			}
-			
-			if sourceField, ok := mapFunc.Source.Fields[sourceFieldName]; ok {
-				if mname != "" {
-					g.Id("target").Dot(string(targetFieldName)).Op("=").Id(mname).Call(jen.Id("src").Dot(sourceFieldName))
-				} else if _, ok := targetField.Desc.(*Primetive); ok {
-					g.Id("target").Dot(string(targetFieldName)).Op("=").Id("src").Dot(string(sourceFieldName))
-				} else if targetStruct, ok := targetField.Desc.(*Struct); ok {
-					hash := string(targetStruct.Hash()) + string(sourceField.Desc.(*Struct).Hash())
-					subMethodName, ok := subMappers[hash]
-					if !ok {
-						subMethodName = genRandomName(15)
-						subMappers[hash] = subMethodName
-					}
-					g.Id("target").Dot(string(targetFieldName)).Op("=").Id("m").Dot(subMethodName).Call(jen.Id("src").Dot(sourceFieldName))
-
-					if !ok {
-						generateSubMapper(f, subMethodName, sourceField.Desc.(*Struct), targetStruct, mapFunc)
-					}
-				}
-			}
-		}
-
-		g.Return(jen.Id("target"))
-	})
-}
-
-var subMappers = make(map[string]string)
-
-func generateSubMapper(f *jen.File, methodName string, sourceStruct *Struct, targetStruct *Struct, mapFunc MapFunc) {
+func genMap(f *jen.File, methodName string, sourceStruct *Struct, targetStruct *Struct, mapFunc MapFunc) {
 	mapF := f.Func().
 		Params(jen.Id("m").Op("*").Id("MapperImpl")).
 		Id(methodName)
@@ -119,7 +55,6 @@ func generateSubMapper(f *jen.File, methodName string, sourceStruct *Struct, tar
 			sourceFieldName := targetFieldName
 			var mname string
 			for _, q := range quals {
-				log.Printf("target full name: %s", targetField.FullName())
 				if q, ok := q.(QualRule); ok && q.TargetName == targetField.FullName() {
 					sourceFieldName = q.SourceName
 					if q.MethodName != "" {
@@ -135,15 +70,15 @@ func generateSubMapper(f *jen.File, methodName string, sourceStruct *Struct, tar
 					g.Id("target").Dot(string(targetFieldName)).Op("=").Id("src").Dot(string(sourceFieldName))
 				} else if nestedSourceStruct, ok := sourceField.Desc.(*Struct); ok {
 					hash := string(nestedSourceStruct.Hash()) + string(targetField.Desc.(*Struct).Hash())
-					methodName, ok := subMappers[hash]
+					methodName, ok := mappers[hash]
 					if !ok {
 						methodName = genRandomName(15)
-						subMappers[hash] = methodName
+						mappers[hash] = methodName
 					}
 					g.Id("target").Dot(string(targetFieldName)).Op("=").Id("m").Dot(methodName).Call(jen.Id("src").Dot(string(sourceFieldName)))
 
 					if !ok {
-						generateSubMapper(f, methodName, nestedSourceStruct, targetField.Desc.(*Struct), mapFunc)
+						genMap(f, methodName, nestedSourceStruct, targetField.Desc.(*Struct), mapFunc)
 					}
 				}
 			}

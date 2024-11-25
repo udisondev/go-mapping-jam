@@ -16,36 +16,36 @@ func (m *MapperImpl) MapPersonToDTO(src domain.Person) dto.Person {
 	target.LastName = src.LastName
 	target.MiddleName = src.MiddleName
 	target.Age = src.Age
-	target.Account = m.fisvhhghtiwqjzh(src.Account)
-	target.Profile = m.duwehjqmznmykhy(src.Profile)
+	target.Account = m.jcdpywqnpqhwsha(src.Account)
+	target.Profile = m.slhgdbecuvpufzm(src.Profile)
 	return target
 }
-func (m *MapperImpl) fisvhhghtiwqjzh(src external.Account) external.Account {
+func (m *MapperImpl) jcdpywqnpqhwsha(src external.Account) external.Account {
 	target := external.Account{}
+	target.Login = m.zfywnpptsapgesl(src.Login)
 	target.Password = src.Password
-	target.Login = m.idgallgnrzziehv(src.Login)
 	return target
 }
-func (m *MapperImpl) idgallgnrzziehv(src user.Login) user.Login {
+func (m *MapperImpl) zfywnpptsapgesl(src user.Login) user.Login {
 	target := user.Login{}
 	target.Value = src.Value
 	return target
 }
-func (m *MapperImpl) duwehjqmznmykhy(src domain.Profile) dto.Profile {
+func (m *MapperImpl) slhgdbecuvpufzm(src domain.Profile) dto.Profile {
 	target := dto.Profile{}
 	target.Phone = src.Number
 	return target
 }
 func (m *MapperImpl) MapPersonToDomain(src dto.Person) domain.Person {
 	target := domain.Person{}
+	target.Profile = m.sszzserevegbqno(src.Profile)
 	target.LastName = src.LastName
 	target.MiddleName = src.MiddleName
 	target.Age = src.Age
-	target.Account = m.fisvhhghtiwqjzh(src.Account)
-	target.Profile = m.nacjonxldnluwbn(src.Profile)
+	target.Account = m.jcdpywqnpqhwsha(src.Account)
 	return target
 }
-func (m *MapperImpl) nacjonxldnluwbn(src dto.Profile) domain.Profile {
+func (m *MapperImpl) sszzserevegbqno(src dto.Profile) domain.Profile {
 	target := domain.Profile{}
 	target.Number = src.Phone
 	return target
