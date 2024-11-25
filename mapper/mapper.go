@@ -13,9 +13,7 @@ import (
 // TODO добавить обработку pointer
 // TODO добавить обработку enum (with default)
 // TODO work with err
-// TODO убрать impl call with package
 // TODO cast
-
 
 // TODO добавить source path
 // TODO expr
