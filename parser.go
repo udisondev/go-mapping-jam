@@ -15,7 +15,7 @@ import (
 
 var pkgs = make(map[string]*packages.Package)
 
-func parse(filePath string) map[string]MapFunc {
+func parse(filePath string) map[string]Mapper {
 	fset := token.NewFileSet()
 	node, err := parser.ParseFile(fset, filePath, nil, parser.ParseComments)
 	if err != nil {
@@ -41,7 +41,7 @@ func parse(filePath string) map[string]MapFunc {
 		if fType, ok := v.Type.(*ast.FuncType); ok {
 			source := extractMappingRoot(fType.Params, mapperImports)
 			target := extractMappingRoot(fType.Results, mapperImports)
-			m := MapFunc{
+			m := Mapper{
 				Name:   v.Names[0].Name,
 				Source: &source,
 				Target: &target,
@@ -74,7 +74,7 @@ func parse(filePath string) map[string]MapFunc {
 	return mappersMap
 }
 
-func (m *MapFunc) initRoot(str *Struct, packFunc func(dir string) *packages.Package) {
+func (m *Mapper) initRoot(str *Struct, packFunc func(dir string) *packages.Package) {
 	pkg, ok := pkgs[str.Path]
 	if !ok {
 		pkg = packFunc(dirByPath(str.Path))
@@ -107,7 +107,7 @@ func dirByPath(p string) string {
 	return strings.ReplaceAll(p, projectName, "./")
 }
 
-func (m *MapFunc) buildField(owner *Field, fieldName string, field *types.Var) *Field {
+func (m *Mapper) buildField(owner *Field, fieldName string, field *types.Var) *Field {
 	switch t := field.Type().(type) {
 	case *types.Basic:
 		return &Field{
@@ -154,6 +154,63 @@ func (m *MapFunc) buildField(owner *Field, fieldName string, field *types.Var) *
 				Desc: &PrimetiveSlice{Primetive: Primetive{
 					Type: b.Name(),
 				}}}
+		}
+
+	case *types.Pointer:
+		switch pt := t.Elem().(type) {
+		case *types.Basic:
+			return &Field{
+				Owner: owner,
+				Name:  fieldName,
+				Desc: &Pointer{
+					Ref: &Primetive{
+						Type: pt.Name(),
+					},
+				},
+			}
+		case *types.Named:
+			structType, ok := pt.Underlying().(*types.Struct)
+			if !ok {
+				return &Field{
+					Owner: owner,
+					Name:  fieldName,
+					Desc: &Pointer{
+						Ref: &Primetive{
+							Type: pt.Obj().Name(),
+						},
+					},
+				}
+			}
+
+			fs := &Field{
+				Owner: owner,
+				Name:  fieldName,
+				Desc: &Pointer{
+					Ref: &Struct{
+						Path:   pt.Obj().Pkg().Path(),
+						Name:   pt.Obj().Name(),
+						Fields: make(map[string]*Field),
+					}},
+			}
+
+			for i := 0; i < structType.NumFields(); i++ {
+				subField := structType.Field(i)
+				subFieldName := subField.Name()
+				fs.Desc.(*Struct).Fields[subFieldName] = m.buildField(fs, subFieldName, subField)
+			}
+
+			return fs
+
+		case *types.Slice:
+			b, ok := pt.Elem().Underlying().(*types.Basic)
+			if ok {
+				return &Field{
+					Owner: owner,
+					Name:  fieldName,
+					Desc: &PrimetiveSlice{Primetive: Primetive{
+						Type: b.Name(),
+					}}}
+			}
 		}
 	}
 
@@ -227,8 +284,8 @@ func parseQualRule(data string) Rule {
 	return QualRule{
 		SourceName: source,
 		TargetName: target,
-		MName: mname,
-		MPath: mpath,
+		MName:      mname,
+		MPath:      mpath,
 	}
 }
 

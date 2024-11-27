@@ -1,15 +1,26 @@
+//go:generate go-enum --noprefix
 package main
 
 import "fmt"
 
+// FieldType ENUM(
+// StructType,
+// PrimetiveType,
+// StructSliceType,
+// PrimetiveSliceType,
+// PointerType,
+// )
+type FieldType uint8
+
 type Mapable interface {
-	isMappable()
+	fieldType() FieldType
 }
 
-func (s *Struct) isMappable()         {}
-func (p *Primetive) isMappable()      {}
-func (p *StructSlice) isMappable()    {}
-func (p *PrimetiveSlice) isMappable() {}
+func (s *Struct) fieldType() FieldType         { return StructType }
+func (p *Primetive) fieldType() FieldType      { return PrimetiveType }
+func (p *StructSlice) fieldType() FieldType    { return StructSliceType }
+func (p *PrimetiveSlice) fieldType() FieldType { return PrimetiveSliceType }
+func (p *Pointer) fieldType() FieldType        { return PointerType }
 
 type Field struct {
 	Owner *Field
@@ -26,6 +37,10 @@ func buildFullName(f *Field) string {
 		return "." + f.Name
 	}
 	return fmt.Sprintf("%s.%s", buildFullName(f.Owner), f.Name)
+}
+
+type Pointer struct {
+	Ref Mapable
 }
 
 type Struct struct {
@@ -46,15 +61,15 @@ type PrimetiveSlice struct {
 	Primetive
 }
 
-type MapFunc struct {
+type Mapper struct {
 	Name   string
 	Source *Struct
 	Target *Struct
-	Rules map[RuleType][]Rule
+	Rules  map[RuleType][]Rule
 }
 
 func (s Struct) Hash() string {
 	return s.Path + "." + s.Name
 }
 
-var mappersMap = make(map[string]MapFunc)
+var mappersMap = make(map[string]Mapper)

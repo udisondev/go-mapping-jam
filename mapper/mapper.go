@@ -24,7 +24,7 @@ type Mapper interface {
 	//@qual={source="Number" target=".Profile.Phone"}
 	MapPersonToDTO(p domain.Person) (d.Person, error)
 
-	//@qual={source="Firstname" target=".FirstName"}
+	//@qual={source="FirstName" target=".Firstname"}
 	//@qual={source="Phone" target=".Profile.Number"}
 	//@qual={target=".Age" mname="int64"}
 	MapPersonToDomain(p d.Person) domain.Person
