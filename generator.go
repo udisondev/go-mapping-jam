@@ -9,56 +9,62 @@ import (
 	jen "github.com/dave/jennifer/jen"
 )
 
-type GeneratedMapper struct {
+type generatedMapper struct {
 	name       string
 	from       *Struct
 	to         *Struct
-	mapper     Mapper
 	file       *jen.File
+	rules      map[RuleType][]Rule
 	statement  *jen.Statement
 	submappers map[string]string
 }
 
-type MapperBlock struct {
-	root  *GeneratedMapper
+type mapperBlock struct {
+	from  func() *Struct
+	to    func() *Struct
 	group *jen.Group
 }
 
-type MappedField struct {
-	root  *MapperBlock
-	name  string
-	field *Field
+type mappedField struct {
+	name       string
+	file       func() *jen.File
+	field      *Field
+	from       func() *Struct
+	to         func() *Struct
+	group      func() *jen.Group
+	rules      func() map[RuleType][]Rule
+	submappers func() map[string]string
 }
 
-type MappingCase string
+type mappingCase string
 
 const (
-	TargetPrimetive_SourcePrimetive       MappingCase = "TargetPrimetiveType_SourcePrimetiveType"
-	TargetPrimetive_SourcePtrPrimetive    MappingCase = "TargetPrimetiveType_SourcePtrPrimetiveType"
-	TargetPtrPrimetive_SourcePrimetive    MappingCase = "TargetPtrPrimetiveType_SourcePrimetiveType"
-	TargetPtrPrimetive_SourcePtrPrimetive MappingCase = "TargetPtrPrimetiveType_SourcePtrPrimetiveType"
-	TargetStruct_SourceStruct             MappingCase = "TargetStructType_SourceStructType"
-	TargetStruct_SourcePtrStruct          MappingCase = "TargetStructType_SourcePtrStructType"
-	TargetPtrStruct_SourceStruct          MappingCase = "TargetPtrStructType_SourceStructType"
-	TargetPtrStruct_SourcePtrStruct       MappingCase = "TargetPtrStructType_SourcePtrStructType"
+	TargetPrimetive_SourcePrimetive       mappingCase = "TargetPrimetiveType_SourcePrimetiveType"
+	TargetPrimetive_SourcePtrPrimetive    mappingCase = "TargetPrimetiveType_SourcePtrPrimetiveType"
+	TargetPtrPrimetive_SourcePrimetive    mappingCase = "TargetPtrPrimetiveType_SourcePrimetiveType"
+	TargetPtrPrimetive_SourcePtrPrimetive mappingCase = "TargetPtrPrimetiveType_SourcePtrPrimetiveType"
+	TargetStruct_SourceStruct             mappingCase = "TargetStructType_SourceStructType"
+	TargetStruct_SourcePtrStruct          mappingCase = "TargetStructType_SourcePtrStructType"
+	TargetPtrStruct_SourceStruct          mappingCase = "TargetPtrStructType_SourceStructType"
+	TargetPtrStruct_SourcePtrStruct       mappingCase = "TargetPtrStructType_SourcePtrStructType"
 )
 
 const charset = "abcdefghijklmnopqrstuvwxyz"
 
-func (gm *GeneratedMapper) generateMapFunc() {
+func (gm *generatedMapper) generateMapFunc() {
 	gm.initSignature()
 	gm.initBody()
 }
 
-func (bl *MapperBlock) initTarget() {
-	if bl.root.to.Path == currentPath {
-		bl.group.Id("target").Op(":=").Id(bl.root.to.Name + "{}")
+func (bl *mapperBlock) initTarget() {
+	if bl.to().Path == currentPath {
+		bl.group.Id("target").Op(":=").Id(bl.to().Name + "{}")
 	} else {
-		bl.group.Id("target").Op(":=").Qual(bl.root.to.Path, bl.root.to.Name+"{}")
+		bl.group.Id("target").Op(":=").Qual(bl.to().Path, bl.to().Name+"{}")
 	}
 }
 
-func (mf *MappedField) mapField() {
+func (mf *mappedField) mapField() {
 	sourceFieldName := mf.name
 	if qr, ok := mf.findQualRule(); ok && qr.SourceName != "" && qr.MName == "" {
 		sourceFieldName = qr.SourceName
@@ -66,7 +72,7 @@ func (mf *MappedField) mapField() {
 		if qr.SourceName != "" {
 			sourceFieldName = qr.SourceName
 		}
-		mf.root.group.Id("target").
+		mf.group().Id("target").
 			Dot(mf.name).
 			Op("=").
 			Qual(qr.MPath, qr.MName).
@@ -76,7 +82,7 @@ func (mf *MappedField) mapField() {
 		if qr.SourceName != "" {
 			sourceFieldName = qr.SourceName
 		}
-		mf.root.group.Id("target").
+		mf.group().Id("target").
 			Dot(mf.name).
 			Op("=").
 			Id(qr.MName).
@@ -84,16 +90,18 @@ func (mf *MappedField) mapField() {
 		return
 	}
 
-	sourceField, ok := mf.root.root.from.Fields[sourceFieldName]
+	sourceField, ok := mf.from().Fields[sourceFieldName]
 	if !ok {
 		log.Fatalf("source field not found for target: %s", mf.field.FullName())
 	}
 
 	switch mf.resolveFieldMapper(sourceField) {
 	case TargetPrimetive_SourcePrimetive:
-		mf.root.group.Id("target").Dot(mf.name).Op("=").Id("src").Dot(sourceFieldName)
+		mf.group().Id("target").Dot(mf.name).Op("=").Id("src").Dot(sourceFieldName)
 	case TargetPrimetive_SourcePtrPrimetive:
+		mf.genPrimetivePtrPrimetive(sourceFieldName)
 	case TargetPtrPrimetive_SourcePrimetive:
+		mf.genPtrPrimetivePrimetive(sourceFieldName)
 	case TargetPtrPrimetive_SourcePtrPrimetive:
 	case TargetStruct_SourceStruct:
 		mf.genStructStructMapping(sourceFieldName, sourceField)
@@ -103,31 +111,45 @@ func (mf *MappedField) mapField() {
 	}
 }
 
-func (mf *MappedField) genStructStructMapping(sourceFieldName string, sourceField *Field) {
+func (mf *mappedField) genPrimetivePtrPrimetive(sourceFieldName string) {
+	mf.group().
+		If(
+			jen.Id("src").Dot(sourceFieldName).Op("!=").Nil(),
+		).
+		Block(
+			jen.Id("target").Dot(mf.field.Name).Op("=").Add(jen.Op("*")).Id("src").Dot(sourceFieldName),
+		)
+}
+
+func (mf *mappedField) genPtrPrimetivePrimetive(sourceFieldName string) {
+	mf.group().Id("target").Dot(mf.name).Op("=").Add(jen.Op("&")).Id("src").Dot(sourceFieldName)
+}
+
+func (mf *mappedField) genStructStructMapping(sourceFieldName string, sourceField *Field) {
 	nestedSourceStruct, _ := sourceField.Desc.(*Struct)
 	hash := nestedSourceStruct.Hash() + mf.field.Desc.(*Struct).Hash()
-	methodName, ok := mf.root.root.submappers[hash]
+	methodName, ok := mf.submappers()[hash]
 	if !ok {
 		methodName = genRandomName(15)
-		mf.root.root.submappers[hash] = methodName
+		mf.submappers()[hash] = methodName
 	}
-	mf.root.group.Id("target").Dot(mf.name).Op("=").Id(methodName).Call(jen.Id("src").Dot(sourceFieldName))
+	mf.group().Id("target").Dot(mf.name).Op("=").Id(methodName).Call(jen.Id("src").Dot(sourceFieldName))
 
 	if !ok {
-		sbm := GeneratedMapper{
+		sbm := generatedMapper{
 			name:       methodName,
 			from:       sourceField.Desc.(*Struct),
 			to:         mf.field.Desc.(*Struct),
-			mapper:     mf.root.root.mapper,
-			file:       mf.root.root.file,
-			submappers: mf.root.root.submappers,
+			file:       mf.file(),
+			rules:      mf.rules(),
+			submappers: mf.submappers(),
 		}
 		sbm.generateMapFunc()
 	}
 }
 
-func (mf *MappedField) findQualRule() (QualRule, bool) {
-	for _, v := range mf.root.root.mapper.Rules[Qual] {
+func (mf *mappedField) findQualRule() (QualRule, bool) {
+	for _, v := range mf.rules()[Qual] {
 		qr, ok := v.(QualRule)
 		if !ok {
 			panic("is not qual rule")
@@ -141,12 +163,25 @@ func (mf *MappedField) findQualRule() (QualRule, bool) {
 	return QualRule{}, false
 }
 
-func (gm *GeneratedMapper) initBody() {
+func (gm *generatedMapper) initBody() {
 	gm.statement.BlockFunc(func(gr *jen.Group) {
-		gbl := MapperBlock{root: gm, group: gr}
+		gbl := mapperBlock{
+			from:  func() *Struct { return gm.from },
+			to:    func() *Struct { return gm.to },
+			group: gr,
+		}
 		gbl.initTarget()
 		for n, f := range gm.to.Fields {
-			field := MappedField{root: &gbl, name: n, field: f}
+			field := mappedField{
+				name:       n,
+				field:      f,
+				file:       func() *jen.File { return gm.file },
+				from:       func() *Struct { return gm.from },
+				to:         func() *Struct { return gm.to },
+				group:      func() *jen.Group { return gr },
+				rules:      func() map[RuleType][]Rule { return gm.rules },
+				submappers: func() map[string]string { return gm.submappers },
+			}
 			field.mapField()
 		}
 		gr.Return(jen.Id("target"))
@@ -159,12 +194,12 @@ func generateCodeWithJennifer(outputFile string, mapFuncs map[string]Mapper) {
 
 	submappers := make(map[string]string)
 	for _, mapFunc := range mapFuncs {
-		gm := GeneratedMapper{
+		gm := generatedMapper{
 			name:       mapFunc.Name,
 			from:       mapFunc.Source,
 			to:         mapFunc.Target,
-			mapper:     mapFunc,
 			file:       f,
+			rules:      mapFunc.Rules,
 			submappers: submappers,
 		}
 		gm.generateMapFunc()
@@ -176,8 +211,8 @@ func generateCodeWithJennifer(outputFile string, mapFuncs map[string]Mapper) {
 	}
 }
 
-func (gf *MappedField) resolveFieldMapper(sourceField *Field) MappingCase {
-	buildMappingCase := func(targetType, sourceType FieldType, isTargetPtr, isSourcePtr bool) MappingCase {
+func (gf *mappedField) resolveFieldMapper(sourceField *Field) mappingCase {
+	buildMappingCase := func(targetType, sourceType FieldType, isTargetPtr, isSourcePtr bool) mappingCase {
 		ptrStr := func(isPrt bool) string {
 			if isPrt {
 				return "Ptr"
@@ -185,7 +220,7 @@ func (gf *MappedField) resolveFieldMapper(sourceField *Field) MappingCase {
 			return ""
 		}
 
-		return MappingCase(fmt.Sprintf("Target%s%s_Source%s%s", ptrStr(isTargetPtr), targetType, ptrStr(isSourcePtr), sourceType))
+		return mappingCase(fmt.Sprintf("Target%s%s_Source%s%s", ptrStr(isTargetPtr), targetType, ptrStr(isSourcePtr), sourceType))
 	}
 
 	if gf.field.Desc.fieldType() != PointerType && sourceField.Desc.fieldType() != PointerType {
@@ -224,15 +259,15 @@ func (gf *MappedField) resolveFieldMapper(sourceField *Field) MappingCase {
 	return ""
 }
 
-func (gm *GeneratedMapper) initSignature() {
+func (gm *generatedMapper) initSignature() {
 	gm.statement = gm.file.Func().Id(gm.name)
-	if gm.mapper.Source.Path == currentPath {
+	if gm.from.Path == currentPath {
 		gm.statement.Params(jen.Id("src").Id(gm.from.Name))
 	} else {
 		gm.statement.Params(jen.Id("src").Qual(gm.from.Path, gm.from.Name))
 	}
 
-	if gm.mapper.Target.Path == currentPath {
+	if gm.to.Path == currentPath {
 		gm.statement.Id(gm.to.Name)
 	} else {
 		gm.statement.Qual(gm.to.Path, gm.to.Name)

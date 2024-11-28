@@ -7,7 +7,7 @@ import (
 )
 
 type Person struct {
-	Firstname string
+	Firstname *string
 	LastName string
 	MiddleName string
 	Age int64

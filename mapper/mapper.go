@@ -12,13 +12,12 @@ import (
 // TODO добавить обработку pointer
 // TODO добавить обработку enum (with default)
 // TODO work with err
-// TODO cast
 
 // TODO добавить source path
 // TODO expr
 type Mapper interface {
 
-	//@qual={source="Firstname" target=".FirstName" mname="FirstNameMapper" mpath="github.com/udisondev/go-mapping-jam/domain"}
+	//@qual={source="Firstname" target=".FirstName"}
 	//@qual={target=".LastName" mname="lastNameMapper"}
 	//@qual={target=".Age" mname="int"}
 	//@qual={source="Number" target=".Profile.Phone"}
