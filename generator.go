@@ -9,48 +9,6 @@ import (
 	jen "github.com/dave/jennifer/jen"
 )
 
-type generatedMapper struct {
-	name       string
-	from       *Struct
-	to         *Struct
-	isFromPrt  bool
-	isToPtr    bool
-	file       *jen.File
-	rules      map[RuleType][]Rule
-	statement  *jen.Statement
-	submappers map[string]string
-}
-
-type mapperBlock struct {
-	from  func() *Struct
-	to    func() *Struct
-	group *jen.Group
-}
-
-type mappedField struct {
-	name       string
-	file       func() *jen.File
-	field      *Field
-	from       func() *Struct
-	to         func() *Struct
-	group      func() *jen.Group
-	rules      func() map[RuleType][]Rule
-	submappers func() map[string]string
-}
-
-type mappingCase string
-
-const (
-	TargetPrimetive_SourcePrimetive       mappingCase = "TargetPrimetiveType_SourcePrimetiveType"
-	TargetPrimetive_SourcePtrPrimetive    mappingCase = "TargetPrimetiveType_SourcePtrPrimetiveType"
-	TargetPtrPrimetive_SourcePrimetive    mappingCase = "TargetPtrPrimetiveType_SourcePrimetiveType"
-	TargetPtrPrimetive_SourcePtrPrimetive mappingCase = "TargetPtrPrimetiveType_SourcePtrPrimetiveType"
-	TargetStruct_SourceStruct             mappingCase = "TargetStructType_SourceStructType"
-	TargetStruct_SourcePtrStruct          mappingCase = "TargetStructType_SourcePtrStructType"
-	TargetPtrStruct_SourceStruct          mappingCase = "TargetPtrStructType_SourceStructType"
-	TargetPtrStruct_SourcePtrStruct       mappingCase = "TargetPtrStructType_SourcePtrStructType"
-)
-
 const charset = "abcdefghijklmnopqrstuvwxyz"
 
 func (gm *generatedMapper) generateMapFunc() {
@@ -92,13 +50,16 @@ func (mf *mappedField) mapField() {
 		return
 	}
 
-	sourceField, ok := mf.from().Fields[sourceFieldName]
+	sourceField, ok := mf.source().Fields[sourceFieldName]
 	if !ok {
 		log.Fatalf("source field not found for target: %s", mf.field.FullName())
 	}
 
 	switch mf.resolveFieldMapper(sourceField) {
-	case TargetPrimetive_SourcePrimetive, TargetPtrPrimetive_SourcePtrPrimetive:
+	case TargetPrimetive_SourcePrimetive,
+		TargetPtrPrimetive_SourcePtrPrimetive,
+		TargetPrimetiveSlice_SourcePrimetiveSlice,
+		TargetPtrPrimetiveSlice_SourcePtrPrimetiveSlice:
 		mf.group().Id("target").Dot(mf.name).Op("=").Id("src").Dot(sourceFieldName)
 	case TargetPrimetive_SourcePtrPrimetive:
 		mf.genPrimetivePtrPrimetive(sourceFieldName)
@@ -299,8 +260,7 @@ func (gm *generatedMapper) initBody() {
 				name:       n,
 				field:      f,
 				file:       func() *jen.File { return gm.file },
-				from:       func() *Struct { return gm.from },
-				to:         func() *Struct { return gm.to },
+				source:     func() *Struct { return gm.from },
 				group:      func() *jen.Group { return gr },
 				rules:      func() map[RuleType][]Rule { return gm.rules },
 				submappers: func() map[string]string { return gm.submappers },

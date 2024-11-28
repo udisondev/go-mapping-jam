@@ -12,5 +12,4 @@ func main() {
 	
 	outputFile := "./mapper/mapper_impl.go"
 	generateCodeWithJennifer(outputFile, mapFuncs)
-
 }

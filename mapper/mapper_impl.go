@@ -11,8 +11,9 @@ import (
 func MapPersonToDTO(src domain.Person) dto.Person {
 	target := dto.Person{}
 	if src.Profile != nil {
-		target.Profile = oewpksroshfzvfm(*src.Profile)
+		target.Profile = wxbnfqbbyyjsqdq(*src.Profile)
 	}
+	target.Projects = src.Projects
 	if src.Firstname != nil {
 		target.FirstName = *src.Firstname
 	}
@@ -20,23 +21,23 @@ func MapPersonToDTO(src domain.Person) dto.Person {
 	target.MiddleName = &src.MiddleName
 	target.Age = src.Age
 	if src.Account != nil {
-		rcfzjtoevjsivgrResult := rcfzjtoevjsivgr(*src.Account)
-		target.Account = &rcfzjtoevjsivgrResult
+		tnsaylfivpjxdfkResult := tnsaylfivpjxdfk(*src.Account)
+		target.Account = &tnsaylfivpjxdfkResult
 	}
 	return target
 }
-func oewpksroshfzvfm(src domain.Profile) dto.Profile {
+func wxbnfqbbyyjsqdq(src domain.Profile) dto.Profile {
 	target := dto.Profile{}
 	target.Phone = src.Number
 	return target
 }
-func rcfzjtoevjsivgr(src external.Account) external.Account {
+func tnsaylfivpjxdfk(src external.Account) external.Account {
 	target := external.Account{}
+	target.Login = vwqfztcevpdmvfz(src.Login)
 	target.Password = src.Password
-	target.Login = xrgnxnkelrvnjuh(src.Login)
 	return target
 }
-func xrgnxnkelrvnjuh(src user.Login) user.Login {
+func vwqfztcevpdmvfz(src user.Login) user.Login {
 	target := user.Login{}
 	target.Value = src.Value
 	return target
@@ -50,14 +51,15 @@ func MapPersonToDomain(src dto.Person) domain.Person {
 	}
 	target.Age = src.Age
 	if src.Account != nil {
-		rcfzjtoevjsivgrResult := rcfzjtoevjsivgr(*src.Account)
-		target.Account = &rcfzjtoevjsivgrResult
+		tnsaylfivpjxdfkResult := tnsaylfivpjxdfk(*src.Account)
+		target.Account = &tnsaylfivpjxdfkResult
 	}
-	pcspfmhmcpevzdaResult := pcspfmhmcpevzda(src.Profile)
-	target.Profile = &pcspfmhmcpevzdaResult
+	saztzqdgjfioecyResult := saztzqdgjfioecy(src.Profile)
+	target.Profile = &saztzqdgjfioecyResult
+	target.Projects = src.Projects
 	return target
 }
-func pcspfmhmcpevzda(src dto.Profile) domain.Profile {
+func saztzqdgjfioecy(src dto.Profile) domain.Profile {
 	target := domain.Profile{}
 	target.Number = src.Phone
 	return target
