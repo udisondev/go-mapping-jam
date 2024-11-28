@@ -196,7 +196,7 @@ func (m *Mapper) buildField(owner *Field, fieldName string, field *types.Var) *F
 			for i := 0; i < structType.NumFields(); i++ {
 				subField := structType.Field(i)
 				subFieldName := subField.Name()
-				fs.Desc.(*Struct).Fields[subFieldName] = m.buildField(fs, subFieldName, subField)
+				fs.Desc.(*Pointer).Ref.(*Struct).Fields[subFieldName] = m.buildField(fs, subFieldName, subField)
 			}
 
 			return fs

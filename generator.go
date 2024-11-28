@@ -13,6 +13,8 @@ type generatedMapper struct {
 	name       string
 	from       *Struct
 	to         *Struct
+	isFromPrt  bool
+	isToPtr    bool
 	file       *jen.File
 	rules      map[RuleType][]Rule
 	statement  *jen.Statement
@@ -96,18 +98,20 @@ func (mf *mappedField) mapField() {
 	}
 
 	switch mf.resolveFieldMapper(sourceField) {
-	case TargetPrimetive_SourcePrimetive:
+	case TargetPrimetive_SourcePrimetive, TargetPtrPrimetive_SourcePtrPrimetive:
 		mf.group().Id("target").Dot(mf.name).Op("=").Id("src").Dot(sourceFieldName)
 	case TargetPrimetive_SourcePtrPrimetive:
 		mf.genPrimetivePtrPrimetive(sourceFieldName)
 	case TargetPtrPrimetive_SourcePrimetive:
 		mf.genPtrPrimetivePrimetive(sourceFieldName)
-	case TargetPtrPrimetive_SourcePtrPrimetive:
 	case TargetStruct_SourceStruct:
 		mf.genStructStructMapping(sourceFieldName, sourceField)
 	case TargetStruct_SourcePtrStruct:
+		mf.genStructPtrStructMapping(sourceFieldName, sourceField)
 	case TargetPtrStruct_SourceStruct:
+		mf.genPtrStructStructMapping(sourceFieldName, sourceField)
 	case TargetPtrStruct_SourcePtrStruct:
+		mf.genPtrStructPtrStructMapping(sourceFieldName, sourceField)
 	}
 }
 
@@ -123,6 +127,125 @@ func (mf *mappedField) genPrimetivePtrPrimetive(sourceFieldName string) {
 
 func (mf *mappedField) genPtrPrimetivePrimetive(sourceFieldName string) {
 	mf.group().Id("target").Dot(mf.name).Op("=").Add(jen.Op("&")).Id("src").Dot(sourceFieldName)
+}
+
+func (mf *mappedField) genPtrStructPtrStructMapping(sourceFieldName string, sourceField *Field) {
+	nestedSourceStruct, ok := sourceField.Desc.(*Pointer).Ref.(*Struct)
+	if !ok {
+		panic("is not a struct")
+	}
+
+	targetField, ok := mf.field.Desc.(*Pointer).Ref.(*Struct)
+	if !ok {
+		panic("is not a struct")
+	}
+
+	hash := nestedSourceStruct.Hash() + targetField.Hash()
+	methodName, ok := mf.submappers()[hash]
+	if !ok {
+		methodName = genRandomName(15)
+		mf.submappers()[hash] = methodName
+	}
+
+	mf.group().
+		If(
+			jen.Id("src").Dot(sourceFieldName).Op("!=").Nil(),
+		).
+		Block(
+			jen.Id(methodName+"Result").Op(":=").Id(methodName).Call(jen.Add(jen.Op("*").Id("src").Dot(sourceFieldName))),
+			jen.Id("target").Dot(mf.field.Name).Op("=").Add(jen.Op("&")).Id(methodName+"Result"),
+		)
+
+	if !ok {
+		sbm := generatedMapper{
+			name:       methodName,
+			from:       nestedSourceStruct,
+			to:         targetField,
+			isFromPrt:  true,
+			isToPtr:    true,
+			file:       mf.file(),
+			rules:      mf.rules(),
+			submappers: mf.submappers(),
+		}
+		sbm.generateMapFunc()
+	}
+}
+
+func (mf *mappedField) genPtrStructStructMapping(sourceFieldName string, sourceField *Field) {
+	nestedSourceStruct, ok := sourceField.Desc.(*Struct)
+	if !ok {
+		panic("is not a struct")
+	}
+
+	targetField, ok := mf.field.Desc.(*Pointer).Ref.(*Struct)
+	if !ok {
+		panic("is not a struct")
+	}
+
+	hash := nestedSourceStruct.Hash() + targetField.Hash()
+	methodName, ok := mf.submappers()[hash]
+	if !ok {
+		methodName = genRandomName(15)
+		mf.submappers()[hash] = methodName
+	}
+
+	mf.group().Id(methodName + "Result").Op(":=").Id(methodName).Call(jen.Id("src").Dot(sourceFieldName))
+	mf.group().Id("target").Dot(mf.field.Name).Op("=").Add(jen.Op("&")).Id(methodName + "Result")
+
+	if !ok {
+		sbm := generatedMapper{
+			name:       methodName,
+			from:       nestedSourceStruct,
+			to:         targetField,
+			isFromPrt:  true,
+			isToPtr:    true,
+			file:       mf.file(),
+			rules:      mf.rules(),
+			submappers: mf.submappers(),
+		}
+		sbm.generateMapFunc()
+	}
+}
+
+func (mf *mappedField) genStructPtrStructMapping(sourceFieldName string, sourceField *Field) {
+	nestedSourceStruct, ok := sourceField.Desc.(*Pointer).Ref.(*Struct)
+	if !ok {
+		panic("is not a struct")
+	}
+
+	targetField, ok := mf.field.Desc.(*Struct)
+	if !ok {
+		panic("is not a struct")
+	}
+
+	hash := nestedSourceStruct.Hash() + targetField.Hash()
+	methodName, ok := mf.submappers()[hash]
+	if !ok {
+		methodName = genRandomName(15)
+		mf.submappers()[hash] = methodName
+	}
+
+	mf.group().
+		If(
+			jen.Id("src").Dot(sourceFieldName).Op("!=").Nil(),
+		).
+		Block(
+			jen.Id("target").Dot(mf.field.Name).Op("=").Id(methodName).Call(jen.Add(jen.Op("*").Id("src").Dot(sourceFieldName))),
+		)
+
+	if !ok {
+		sbm := generatedMapper{
+			name:       methodName,
+			from:       nestedSourceStruct,
+			to:         targetField,
+			isFromPrt:  true,
+			isToPtr:    true,
+			file:       mf.file(),
+			rules:      mf.rules(),
+			submappers: mf.submappers(),
+		}
+		sbm.generateMapFunc()
+	}
 }
 
 func (mf *mappedField) genStructStructMapping(sourceFieldName string, sourceField *Field) {

@@ -10,9 +10,9 @@ type Person struct {
 	Firstname *string
 	LastName string
 	MiddleName string
-	Age int64
-	Account external.Account
-	Profile Profile
+	Age *int
+	Account *external.Account
+	Profile *Profile
 	Projects []string
 }
 

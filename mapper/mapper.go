@@ -9,7 +9,6 @@ import (
 
 // TODO добавить обработку slice
 // TODO добавить обработку map
-// TODO добавить обработку pointer
 // TODO добавить обработку enum (with default)
 // TODO work with err
 
@@ -19,13 +18,11 @@ type Mapper interface {
 
 	//@qual={source="Firstname" target=".FirstName"}
 	//@qual={target=".LastName" mname="lastNameMapper"}
-	//@qual={target=".Age" mname="int"}
 	//@qual={source="Number" target=".Profile.Phone"}
 	MapPersonToDTO(p domain.Person) (d.Person, error)
 
 	//@qual={source="FirstName" target=".Firstname"}
 	//@qual={source="Phone" target=".Profile.Number"}
-	//@qual={target=".Age" mname="int64"}
 	MapPersonToDomain(p d.Person) domain.Person
 }
 
