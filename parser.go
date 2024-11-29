@@ -146,16 +146,43 @@ func (m *Mapper) buildField(owner *Field, fieldName string, field *types.Var) *F
 		return fs
 
 	case *types.Slice:
-		b, ok := t.Elem().Underlying().(*types.Basic)
-		if ok {
+		switch slt := t.Elem().Underlying().(type) {
+		case *types.Basic:
 			return &Field{
 				Owner: owner,
 				Name:  fieldName,
 				Desc: &PrimetiveSlice{Primetive: Primetive{
-					Type: b.Name(),
+					Type: slt.Name(),
 				}}}
-		}
+		case *types.Named:
+			structType, ok := slt.Underlying().(*types.Struct)
+			if !ok {
+				return &Field{
+					Owner: owner,
+					Name:  fieldName,
+					Desc: &PrimetiveSlice{Primetive: Primetive{
+						Type: slt.Obj().Name(),
+					}}}
+			}
 
+			fs := &Field{
+				Owner: owner,
+				Name:  fieldName,
+				Desc: &StructSlice{
+					Struct: &Struct{
+						Path:   slt.Obj().Pkg().Path(),
+						Name:   slt.Obj().Name(),
+						Fields: make(map[string]*Field),
+					}}}
+
+			for i := 0; i < structType.NumFields(); i++ {
+				subField := structType.Field(i)
+				subFieldName := subField.Name()
+				fs.Desc.(*Struct).Fields[subFieldName] = m.buildField(fs, subFieldName, subField)
+			}
+
+			return fs
+		}
 	case *types.Pointer:
 		switch pt := t.Elem().(type) {
 		case *types.Basic:
@@ -202,14 +229,42 @@ func (m *Mapper) buildField(owner *Field, fieldName string, field *types.Var) *F
 			return fs
 
 		case *types.Slice:
-			b, ok := pt.Elem().Underlying().(*types.Basic)
-			if ok {
+			switch slt := pt.Elem().Underlying().(type) {
+			case *types.Basic:
 				return &Field{
 					Owner: owner,
 					Name:  fieldName,
 					Desc: &PrimetiveSlice{Primetive: Primetive{
-						Type: b.Name(),
+						Type: slt.Name(),
 					}}}
+			case *types.Named:
+				structType, ok := slt.Underlying().(*types.Struct)
+				if !ok {
+					return &Field{
+						Owner: owner,
+						Name:  fieldName,
+						Desc: &PrimetiveSlice{Primetive: Primetive{
+							Type: slt.Obj().Name(),
+						}}}
+				}
+	
+				fs := &Field{
+					Owner: owner,
+					Name:  fieldName,
+					Desc: &StructSlice{
+						Struct: &Struct{
+							Path:   slt.Obj().Pkg().Path(),
+							Name:   slt.Obj().Name(),
+							Fields: make(map[string]*Field),
+						}}}
+	
+				for i := 0; i < structType.NumFields(); i++ {
+					subField := structType.Field(i)
+					subFieldName := subField.Name()
+					fs.Desc.(*Struct).Fields[subFieldName] = m.buildField(fs, subFieldName, subField)
+				}
+	
+				return fs
 			}
 		}
 	}

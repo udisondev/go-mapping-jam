@@ -45,4 +45,8 @@ const (
 	TargetStruct_SourcePtrStruct                    mappingCase = "TargetStructType_SourcePtrStructType"
 	TargetPtrStruct_SourceStruct                    mappingCase = "TargetPtrStructType_SourceStructType"
 	TargetPtrStruct_SourcePtrStruct                 mappingCase = "TargetPtrStructType_SourcePtrStructType"
+	TargetStructSlice_SourceStructSlice             mappingCase = "TargetStructSliceType_SourceStructSliceType"
+	TargetStructSlice_SourcePtrStructSlice          mappingCase = "TargetStructSliceType_SourcePtrStructSliceType"
+	TargetPtrStructSlice_SourceStructSlice          mappingCase = "TargetPtrStructSliceType_SourceStructSliceType"
+	TargetPtrStructSlice_SourcePtrStructSlice       mappingCase = "TargetPtrStructSliceType_SourcePtrStructSliceType"
 )

@@ -73,6 +73,14 @@ func (mf *mappedField) mapField() {
 		mf.genPtrStructStructMapping(sourceFieldName, sourceField)
 	case TargetPtrStruct_SourcePtrStruct:
 		mf.genPtrStructPtrStructMapping(sourceFieldName, sourceField)
+	case TargetStructSlice_SourceStructSlice:
+		mf.genStructStructMapping(sourceFieldName, sourceField)
+	case TargetStructSlice_SourcePtrStructSlice:
+		mf.genStructPtrStructMapping(sourceFieldName, sourceField)
+	case TargetPtrStructSlice_SourceStructSlice:
+		mf.genPtrStructStructMapping(sourceFieldName, sourceField)
+	case TargetPtrStructSlice_SourcePtrStructSlice:
+		mf.genPtrStructPtrStructMapping(sourceFieldName, sourceField)
 	}
 }
 
@@ -217,6 +225,30 @@ func (mf *mappedField) genStructStructMapping(sourceFieldName string, sourceFiel
 		methodName = genRandomName(15)
 		mf.submappers()[hash] = methodName
 	}
+	mf.group().Id("target").Dot(mf.name).Op("=").Id(methodName).Call(jen.Id("src").Dot(sourceFieldName))
+
+	if !ok {
+		sbm := generatedMapper{
+			name:       methodName,
+			from:       sourceField.Desc.(*Struct),
+			to:         mf.field.Desc.(*Struct),
+			file:       mf.file(),
+			rules:      mf.rules(),
+			submappers: mf.submappers(),
+		}
+		sbm.generateMapFunc()
+	}
+}
+
+func (mf *mappedField) genStructSliceStructSliceMapping(sourceFieldName string, sourceField *Field) {
+	nestedSourceStruct, _ := sourceField.Desc.(*Struct)
+	hash := nestedSourceStruct.Hash() + mf.field.Desc.(*Struct).Hash()
+	methodName, ok := mf.submappers()[hash]
+	if !ok {
+		methodName = genRandomName(15)
+		mf.submappers()[hash] = methodName
+	}
+	mf.group().Id("target" + mf.name + "Slice").Op(":=").Make(jen.)
 	mf.group().Id("target").Dot(mf.name).Op("=").Id(methodName).Call(jen.Id("src").Dot(sourceFieldName))
 
 	if !ok {
