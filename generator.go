@@ -74,7 +74,7 @@ func (mf *mappedField) mapField() {
 	case TargetPtrStruct_SourcePtrStruct:
 		mf.genPtrStructPtrStructMapping(sourceFieldName, sourceField)
 	case TargetStructSlice_SourceStructSlice:
-		mf.genStructStructMapping(sourceFieldName, sourceField)
+		mf.genStructSliceStructSliceMapping(sourceFieldName, sourceField)
 	case TargetStructSlice_SourcePtrStructSlice:
 		mf.genStructPtrStructMapping(sourceFieldName, sourceField)
 	case TargetPtrStructSlice_SourceStructSlice:
@@ -241,21 +241,32 @@ func (mf *mappedField) genStructStructMapping(sourceFieldName string, sourceFiel
 }
 
 func (mf *mappedField) genStructSliceStructSliceMapping(sourceFieldName string, sourceField *Field) {
-	nestedSourceStruct, _ := sourceField.Desc.(*Struct)
-	hash := nestedSourceStruct.Hash() + mf.field.Desc.(*Struct).Hash()
+	targetStruct := mf.field.Desc.(*StructSlice).Struct
+
+ 	nestedSourceStruct := sourceField.Desc.(*StructSlice).Struct
+	hash := nestedSourceStruct.Hash() + targetStruct.Hash()
 	methodName, ok := mf.submappers()[hash]
 	if !ok {
 		methodName = genRandomName(15)
 		mf.submappers()[hash] = methodName
 	}
-	mf.group().Id("target" + mf.name + "Slice").Op(":=").Make(jen.)
-	mf.group().Id("target").Dot(mf.name).Op("=").Id(methodName).Call(jen.Id("src").Dot(sourceFieldName))
+	mf.group().Id("target" + mf.name + "Slice").Op(":=").Make(jen.Index().Qual(targetStruct.Path, targetStruct.Name), jen.Lit(0), jen.Len(jen.Id("target").Dot(mf.name)))
+	mf.group().
+	For(
+		jen.List(jen.Id("_"), jen.Id("it")).Op(":=").Range().Id("src").Dot(sourceFieldName),
+	).
+	Block(
+		jen.Id("target" + mf.name + "Slice").Op("=").Append(jen.Id("target" + mf.name + "Slice"), jen.Id(methodName).Call(jen.Id("it"))),
+	)
+
+	mf.group().Id("target").Dot(mf.name).Op("=").Id("target" + mf.name + "Slice")
+	
 
 	if !ok {
 		sbm := generatedMapper{
 			name:       methodName,
-			from:       sourceField.Desc.(*Struct),
-			to:         mf.field.Desc.(*Struct),
+			from:       nestedSourceStruct,
+			to:         targetStruct,
 			file:       mf.file(),
 			rules:      mf.rules(),
 			submappers: mf.submappers(),

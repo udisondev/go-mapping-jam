@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"go/ast"
 	"go/parser"
 	"go/token"
@@ -146,7 +147,7 @@ func (m *Mapper) buildField(owner *Field, fieldName string, field *types.Var) *F
 		return fs
 
 	case *types.Slice:
-		switch slt := t.Elem().Underlying().(type) {
+		switch slt := t.Elem().(type) {
 		case *types.Basic:
 			return &Field{
 				Owner: owner,
@@ -154,6 +155,7 @@ func (m *Mapper) buildField(owner *Field, fieldName string, field *types.Var) *F
 				Desc: &PrimetiveSlice{Primetive: Primetive{
 					Type: slt.Name(),
 				}}}
+
 		case *types.Named:
 			structType, ok := slt.Underlying().(*types.Struct)
 			if !ok {
@@ -178,7 +180,7 @@ func (m *Mapper) buildField(owner *Field, fieldName string, field *types.Var) *F
 			for i := 0; i < structType.NumFields(); i++ {
 				subField := structType.Field(i)
 				subFieldName := subField.Name()
-				fs.Desc.(*Struct).Fields[subFieldName] = m.buildField(fs, subFieldName, subField)
+				fs.Desc.(*StructSlice).Struct.Fields[subFieldName] = m.buildField(fs, subFieldName, subField)
 			}
 
 			return fs
@@ -229,6 +231,7 @@ func (m *Mapper) buildField(owner *Field, fieldName string, field *types.Var) *F
 			return fs
 
 		case *types.Slice:
+
 			switch slt := pt.Elem().Underlying().(type) {
 			case *types.Basic:
 				return &Field{
@@ -247,7 +250,7 @@ func (m *Mapper) buildField(owner *Field, fieldName string, field *types.Var) *F
 							Type: slt.Obj().Name(),
 						}}}
 				}
-	
+
 				fs := &Field{
 					Owner: owner,
 					Name:  fieldName,
@@ -257,20 +260,19 @@ func (m *Mapper) buildField(owner *Field, fieldName string, field *types.Var) *F
 							Name:   slt.Obj().Name(),
 							Fields: make(map[string]*Field),
 						}}}
-	
+
 				for i := 0; i < structType.NumFields(); i++ {
 					subField := structType.Field(i)
 					subFieldName := subField.Name()
 					fs.Desc.(*Struct).Fields[subFieldName] = m.buildField(fs, subFieldName, subField)
 				}
-	
+
 				return fs
 			}
 		}
 	}
 
-	log.Fatalf("unknown field type: %v", field.Type())
-	return nil
+	panic(fmt.Sprintf("unknown field type: %v", field.Type()))
 }
 
 func parseRules(input string) []Rule {
