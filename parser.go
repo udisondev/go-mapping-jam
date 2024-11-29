@@ -118,13 +118,17 @@ func (m *Mapper) buildField(owner *Field, fieldName string, field *types.Var) *F
 				Type: t.Name(),
 			}}
 	case *types.Named:
+		fmt.Printf("Name: %s\n", t.Obj().Name())
+		fmt.Printf("Pkg name: %s\n", t.Obj().Pkg().Name())
+		fmt.Printf("Pkg path: %s\n", t.Obj().Pkg().Path())
 		structType, ok := t.Underlying().(*types.Struct)
 		if !ok {
 			return &Field{
 				Owner: owner,
 				Name:  fieldName,
-				Desc: &Primetive{
-					Type: t.Obj().Name(),
+				Desc: &Enum{
+					Name: t.Obj().Name(),
+					Path: t.Obj().Pkg().Name(),
 				},
 			}
 		}
@@ -136,7 +140,8 @@ func (m *Mapper) buildField(owner *Field, fieldName string, field *types.Var) *F
 				Path:   t.Obj().Pkg().Path(),
 				Name:   t.Obj().Name(),
 				Fields: make(map[string]*Field),
-			}}
+			},
+		}
 
 		for i := 0; i < structType.NumFields(); i++ {
 			subField := structType.Field(i)
@@ -152,7 +157,7 @@ func (m *Mapper) buildField(owner *Field, fieldName string, field *types.Var) *F
 			return &Field{
 				Owner: owner,
 				Name:  fieldName,
-				Desc: &PrimetiveSlice{Primetive: Primetive{
+				Desc: &Slice{Of: &Primetive{
 					Type: slt.Name(),
 				}}}
 
@@ -162,7 +167,7 @@ func (m *Mapper) buildField(owner *Field, fieldName string, field *types.Var) *F
 				return &Field{
 					Owner: owner,
 					Name:  fieldName,
-					Desc: &PrimetiveSlice{Primetive: Primetive{
+					Desc: &Slice{Of: &Primetive{
 						Type: slt.Obj().Name(),
 					}}}
 			}
@@ -170,8 +175,8 @@ func (m *Mapper) buildField(owner *Field, fieldName string, field *types.Var) *F
 			fs := &Field{
 				Owner: owner,
 				Name:  fieldName,
-				Desc: &StructSlice{
-					Struct: &Struct{
+				Desc: &Slice{
+					Of: &Struct{
 						Path:   slt.Obj().Pkg().Path(),
 						Name:   slt.Obj().Name(),
 						Fields: make(map[string]*Field),
@@ -180,7 +185,7 @@ func (m *Mapper) buildField(owner *Field, fieldName string, field *types.Var) *F
 			for i := 0; i < structType.NumFields(); i++ {
 				subField := structType.Field(i)
 				subFieldName := subField.Name()
-				fs.Desc.(*StructSlice).Struct.Fields[subFieldName] = m.buildField(fs, subFieldName, subField)
+				fs.Desc.(*Slice).Of.(*Struct).Fields[subFieldName] = m.buildField(fs, subFieldName, subField)
 			}
 
 			return fs
@@ -192,7 +197,7 @@ func (m *Mapper) buildField(owner *Field, fieldName string, field *types.Var) *F
 				Owner: owner,
 				Name:  fieldName,
 				Desc: &Pointer{
-					Ref: &Primetive{
+					To: &Primetive{
 						Type: pt.Name(),
 					},
 				},
@@ -204,7 +209,7 @@ func (m *Mapper) buildField(owner *Field, fieldName string, field *types.Var) *F
 					Owner: owner,
 					Name:  fieldName,
 					Desc: &Pointer{
-						Ref: &Primetive{
+						To: &Primetive{
 							Type: pt.Obj().Name(),
 						},
 					},
@@ -215,7 +220,7 @@ func (m *Mapper) buildField(owner *Field, fieldName string, field *types.Var) *F
 				Owner: owner,
 				Name:  fieldName,
 				Desc: &Pointer{
-					Ref: &Struct{
+					To: &Struct{
 						Path:   pt.Obj().Pkg().Path(),
 						Name:   pt.Obj().Name(),
 						Fields: make(map[string]*Field),
@@ -225,7 +230,7 @@ func (m *Mapper) buildField(owner *Field, fieldName string, field *types.Var) *F
 			for i := 0; i < structType.NumFields(); i++ {
 				subField := structType.Field(i)
 				subFieldName := subField.Name()
-				fs.Desc.(*Pointer).Ref.(*Struct).Fields[subFieldName] = m.buildField(fs, subFieldName, subField)
+				fs.Desc.(*Pointer).To.(*Struct).Fields[subFieldName] = m.buildField(fs, subFieldName, subField)
 			}
 
 			return fs
@@ -237,7 +242,7 @@ func (m *Mapper) buildField(owner *Field, fieldName string, field *types.Var) *F
 				return &Field{
 					Owner: owner,
 					Name:  fieldName,
-					Desc: &PrimetiveSlice{Primetive: Primetive{
+					Desc: &Slice{Of: &Primetive{
 						Type: slt.Name(),
 					}}}
 			case *types.Named:
@@ -246,7 +251,7 @@ func (m *Mapper) buildField(owner *Field, fieldName string, field *types.Var) *F
 					return &Field{
 						Owner: owner,
 						Name:  fieldName,
-						Desc: &PrimetiveSlice{Primetive: Primetive{
+						Desc: &Slice{Of: &Primetive{
 							Type: slt.Obj().Name(),
 						}}}
 				}
@@ -254,8 +259,8 @@ func (m *Mapper) buildField(owner *Field, fieldName string, field *types.Var) *F
 				fs := &Field{
 					Owner: owner,
 					Name:  fieldName,
-					Desc: &StructSlice{
-						Struct: &Struct{
+					Desc: &Slice{
+						Of: &Struct{
 							Path:   slt.Obj().Pkg().Path(),
 							Name:   slt.Obj().Name(),
 							Fields: make(map[string]*Field),
@@ -347,16 +352,7 @@ func parseQualRule(data string) Rule {
 }
 
 func parseEnumRule(data string) Rule {
-	re := regexp.MustCompile(`(\w+)=([\w]+)`)
-	matches := re.FindAllStringSubmatch(data, -1)
-	if matches == nil {
-		log.Fatalf("invalid enum format: %s", data)
-	}
-	enumMap := make(map[string]string)
-	for _, match := range matches {
-		enumMap[match[1]] = match[2]
-	}
-	return EnumRule{EnumMapping: enumMap}
+	return EnumRule{}
 }
 
 func extractMethods(n ast.Node) []*ast.Field {

@@ -55,33 +55,92 @@ func (mf *mappedField) mapField() {
 		log.Fatalf("source field not found for target: %s", mf.field.FullName())
 	}
 
-	switch mf.resolveFieldMapper(sourceField) {
-	case TargetPrimetive_SourcePrimetive,
-		TargetPtrPrimetive_SourcePtrPrimetive,
-		TargetPrimetiveSlice_SourcePrimetiveSlice,
-		TargetPtrPrimetiveSlice_SourcePtrPrimetiveSlice:
-		mf.group().Id("target").Dot(mf.name).Op("=").Id("src").Dot(sourceFieldName)
-	case TargetPrimetive_SourcePtrPrimetive:
-		mf.genPrimetivePtrPrimetive(sourceFieldName)
-	case TargetPtrPrimetive_SourcePrimetive:
-		mf.genPtrPrimetivePrimetive(sourceFieldName)
-	case TargetStruct_SourceStruct:
-		mf.genStructStructMapping(sourceFieldName, sourceField)
-	case TargetStruct_SourcePtrStruct:
-		mf.genStructPtrStructMapping(sourceFieldName, sourceField)
-	case TargetPtrStruct_SourceStruct:
-		mf.genPtrStructStructMapping(sourceFieldName, sourceField)
-	case TargetPtrStruct_SourcePtrStruct:
-		mf.genPtrStructPtrStructMapping(sourceFieldName, sourceField)
-	case TargetStructSlice_SourceStructSlice:
-		mf.genStructSliceStructSliceMapping(sourceFieldName, sourceField)
-	case TargetStructSlice_SourcePtrStructSlice:
-		mf.genStructPtrStructMapping(sourceFieldName, sourceField)
-	case TargetPtrStructSlice_SourceStructSlice:
-		mf.genPtrStructStructMapping(sourceFieldName, sourceField)
-	case TargetPtrStructSlice_SourcePtrStructSlice:
-		mf.genPtrStructPtrStructMapping(sourceFieldName, sourceField)
+	switch tarT := mf.field.Desc.(type) {
+	case *Primetive:
+		switch srcT := sourceField.Desc.(type) {
+		case *Primetive:
+			mf.genPrimetivePrimetive(sourceFieldName)
+		case *Pointer:
+			_, ok := srcT.To.(*Primetive)
+			if !ok {
+				panic(fmt.Sprintf("source field is not a pointer to primetive for target: %s", mf.field.FullName()))
+			}
+			mf.genPrimetivePtrPrimetive(sourceFieldName)
+		}
+	case *Struct:
+		switch srcT := sourceField.Desc.(type) {
+		case *Struct:
+			mf.genStructStructMapping(sourceFieldName, sourceField)
+		case *Pointer:
+			_, ok := srcT.To.(*Struct)
+			if !ok {
+				panic(fmt.Sprintf("source field is not a pointer to struct for target: %s", mf.field.FullName()))
+			}
+			mf.genStructPtrStructMapping(sourceFieldName, sourceField)
+		}
+	case *Enum:
+		switch srcT := sourceField.Desc.(type) {
+		case *Enum:
+			if srcT.Name == tarT.Name {
+				mf.genPrimetivePrimetive(sourceFieldName)
+				break
+			}
+			mf.genEnumMapping(sourceFieldName, sourceField)
+		}
+	case *Slice:
+		switch tarT.Of.(type) {
+		case *Primetive:
+			slc, ok := sourceField.Desc.(*Slice)
+			if !ok {
+				panic(fmt.Sprintf("source field is not a slice for target: %s", mf.field.FullName()))
+			}
+			_, ok = slc.Of.(*Primetive)
+			if !ok {
+				panic(fmt.Sprintf("source field is not a slice of primetive for target: %s", mf.field.FullName()))
+			}
+			mf.group().Id("target").Dot(mf.name).Op("=").Id("src").Dot(sourceFieldName)
+		case *Struct:
+			slc, ok := sourceField.Desc.(*Slice)
+			if !ok {
+				panic(fmt.Sprintf("source field is not a slice for target: %s", mf.field.FullName()))
+			}
+			_, ok = slc.Of.(*Struct)
+			if !ok {
+				panic(fmt.Sprintf("source field is not a slice of struct for target: %s", mf.field.FullName()))
+			}
+			mf.genStructSliceStructSliceMapping(sourceFieldName, sourceField)
+		}
+	case *Pointer:
+		switch tarT.To.(type) {
+		case *Primetive:
+			switch srcT := sourceField.Desc.(type) {
+			case *Primetive:
+				mf.genPtrPrimetivePrimetive(sourceFieldName)
+			case *Pointer:
+				_, ok := srcT.To.(*Primetive)
+				if !ok {
+					panic(fmt.Sprintf("source field is not a pointer to primetive for target: %s", mf.field.FullName()))
+				}
+				mf.genPrimetivePrimetive(sourceFieldName)
+			}
+		case *Struct:
+			switch srcT := sourceField.Desc.(type) {
+			case *Struct:
+				mf.genPtrStructStructMapping(sourceFieldName, sourceField)
+			case *Pointer:
+				_, ok := srcT.To.(*Struct)
+				if !ok {
+					panic(fmt.Sprintf("source field is not a pointer to struct for target: %s", mf.field.FullName()))
+				}
+				mf.genPtrStructPtrStructMapping(sourceFieldName, sourceField)
+			}
+		}
 	}
+
+}
+
+func (mf *mappedField) genEnumMapping(sourceFieldName string, sourceField *Field) {
+
 }
 
 func (mf *mappedField) genPrimetivePtrPrimetive(sourceFieldName string) {
@@ -94,17 +153,21 @@ func (mf *mappedField) genPrimetivePtrPrimetive(sourceFieldName string) {
 		)
 }
 
+func (mf *mappedField) genPrimetivePrimetive(sourceFieldName string) {
+	mf.group().Id("target").Dot(mf.name).Op("=").Id("src").Dot(sourceFieldName)
+}
+
 func (mf *mappedField) genPtrPrimetivePrimetive(sourceFieldName string) {
 	mf.group().Id("target").Dot(mf.name).Op("=").Add(jen.Op("&")).Id("src").Dot(sourceFieldName)
 }
 
 func (mf *mappedField) genPtrStructPtrStructMapping(sourceFieldName string, sourceField *Field) {
-	nestedSourceStruct, ok := sourceField.Desc.(*Pointer).Ref.(*Struct)
+	nestedSourceStruct, ok := sourceField.Desc.(*Pointer).To.(*Struct)
 	if !ok {
 		panic("is not a struct")
 	}
 
-	targetField, ok := mf.field.Desc.(*Pointer).Ref.(*Struct)
+	targetField, ok := mf.field.Desc.(*Pointer).To.(*Struct)
 	if !ok {
 		panic("is not a struct")
 	}
@@ -146,7 +209,7 @@ func (mf *mappedField) genPtrStructStructMapping(sourceFieldName string, sourceF
 		panic("is not a struct")
 	}
 
-	targetField, ok := mf.field.Desc.(*Pointer).Ref.(*Struct)
+	targetField, ok := mf.field.Desc.(*Pointer).To.(*Struct)
 	if !ok {
 		panic("is not a struct")
 	}
@@ -177,7 +240,7 @@ func (mf *mappedField) genPtrStructStructMapping(sourceFieldName string, sourceF
 }
 
 func (mf *mappedField) genStructPtrStructMapping(sourceFieldName string, sourceField *Field) {
-	nestedSourceStruct, ok := sourceField.Desc.(*Pointer).Ref.(*Struct)
+	nestedSourceStruct, ok := sourceField.Desc.(*Pointer).To.(*Struct)
 	if !ok {
 		panic("is not a struct")
 	}
@@ -241,26 +304,25 @@ func (mf *mappedField) genStructStructMapping(sourceFieldName string, sourceFiel
 }
 
 func (mf *mappedField) genStructSliceStructSliceMapping(sourceFieldName string, sourceField *Field) {
-	targetStruct := mf.field.Desc.(*StructSlice).Struct
+	targetStruct := mf.field.Desc.(*Slice).Of.(*Struct)
 
- 	nestedSourceStruct := sourceField.Desc.(*StructSlice).Struct
+	nestedSourceStruct := sourceField.Desc.(*Slice).Of.(*Struct)
 	hash := nestedSourceStruct.Hash() + targetStruct.Hash()
 	methodName, ok := mf.submappers()[hash]
 	if !ok {
 		methodName = genRandomName(15)
 		mf.submappers()[hash] = methodName
 	}
-	mf.group().Id("target" + mf.name + "Slice").Op(":=").Make(jen.Index().Qual(targetStruct.Path, targetStruct.Name), jen.Lit(0), jen.Len(jen.Id("target").Dot(mf.name)))
+	mf.group().Id("target"+mf.name+"Slice").Op(":=").Make(jen.Index().Qual(targetStruct.Path, targetStruct.Name), jen.Lit(0), jen.Len(jen.Id("target").Dot(mf.name)))
 	mf.group().
-	For(
-		jen.List(jen.Id("_"), jen.Id("it")).Op(":=").Range().Id("src").Dot(sourceFieldName),
-	).
-	Block(
-		jen.Id("target" + mf.name + "Slice").Op("=").Append(jen.Id("target" + mf.name + "Slice"), jen.Id(methodName).Call(jen.Id("it"))),
-	)
+		For(
+			jen.List(jen.Id("_"), jen.Id("it")).Op(":=").Range().Id("src").Dot(sourceFieldName),
+		).
+		Block(
+			jen.Id("target"+mf.name+"Slice").Op("=").Append(jen.Id("target"+mf.name+"Slice"), jen.Id(methodName).Call(jen.Id("it"))),
+		)
 
 	mf.group().Id("target").Dot(mf.name).Op("=").Id("target" + mf.name + "Slice")
-	
 
 	if !ok {
 		sbm := generatedMapper{
@@ -276,7 +338,7 @@ func (mf *mappedField) genStructSliceStructSliceMapping(sourceFieldName string, 
 }
 
 func (mf *mappedField) findQualRule() (QualRule, bool) {
-	for _, v := range mf.rules()[Qual] {
+	for _, v := range mf.rules()[RuleTypeQual] {
 		qr, ok := v.(QualRule)
 		if !ok {
 			panic("is not qual rule")
@@ -358,7 +420,7 @@ func (gf *mappedField) resolveFieldMapper(sourceField *Field) mappingCase {
 		if !ok {
 			panic("is not a pointer")
 		}
-		return buildMappingCase(tarPtr.Ref.fieldType(), sourceField.Desc.fieldType(), true, false)
+		return buildMappingCase(tarPtr.To.fieldType(), sourceField.Desc.fieldType(), true, false)
 	}
 
 	if gf.field.Desc.fieldType() == PointerType && sourceField.Desc.fieldType() == PointerType {
@@ -371,7 +433,7 @@ func (gf *mappedField) resolveFieldMapper(sourceField *Field) mappingCase {
 		if !ok {
 			panic("is not a pointer")
 		}
-		return buildMappingCase(tarPtr.Ref.fieldType(), srcPtr.Ref.fieldType(), true, true)
+		return buildMappingCase(tarPtr.To.fieldType(), srcPtr.To.fieldType(), true, true)
 	}
 
 	if gf.field.Desc.fieldType() != PointerType && sourceField.Desc.fieldType() == PointerType {
@@ -379,7 +441,7 @@ func (gf *mappedField) resolveFieldMapper(sourceField *Field) mappingCase {
 		if !ok {
 			panic("is not a pointer")
 		}
-		return buildMappingCase(gf.field.Desc.fieldType(), srcPtr.Ref.fieldType(), false, true)
+		return buildMappingCase(gf.field.Desc.fieldType(), srcPtr.To.fieldType(), false, true)
 	}
 
 	return ""

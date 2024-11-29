@@ -13,8 +13,16 @@ type Person struct {
 	Age *int
 	Account []external.Account
 	Profile *Profile
+	Type PersonType
 	Projects []string
 }
+
+type PersonType uint8
+
+const (
+	Simple PersonType = iota + 1
+	Important
+)
 
 type Profile struct {
 	Number string

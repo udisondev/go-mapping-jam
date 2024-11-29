@@ -1,3 +1,4 @@
+//go:generate go-enum
 package main
 
 type QualRule struct {
@@ -11,22 +12,25 @@ type CustomMapper struct {
 }
 
 type EnumRule struct {
-	EnumMapping map[string]string
+	Source EnumItem
+	Target EnumItem
+	Map map[string]string
 }
 
-type RuleType uint8
+type EnumItem struct {
+	Name string
+	Path string
+}
 
-const (
-	Qual RuleType = iota + 1
-	Enum
-)
+// RuleType ENUM(qual, enum)
+type RuleType uint8
 
 type Rule interface {
 	Type() RuleType
 }
 
-func (nr QualRule) Type() RuleType { return Qual }
-func (er EnumRule) Type() RuleType { return Enum }
+func (nr QualRule) Type() RuleType { return RuleTypeQual }
+func (er EnumRule) Type() RuleType { return RuleTypeEnum }
 
 type RuleFactory func(string) Rule
 

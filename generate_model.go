@@ -31,22 +31,3 @@ type mappedField struct {
 }
 
 type mappingCase string
-
-const (
-	TargetPrimetive_SourcePrimetive                 mappingCase = "TargetPrimetiveType_SourcePrimetiveType"
-	TargetPrimetive_SourcePtrPrimetive              mappingCase = "TargetPrimetiveType_SourcePtrPrimetiveType"
-	TargetPtrPrimetive_SourcePrimetive              mappingCase = "TargetPtrPrimetiveType_SourcePrimetiveType"
-	TargetPtrPrimetive_SourcePtrPrimetive           mappingCase = "TargetPtrPrimetiveType_SourcePtrPrimetiveType"
-	TargetPrimetiveSlice_SourcePrimetiveSlice       mappingCase = "TargetPrimetiveSliceType_SourcePrimetiveSliceType"
-	TargetPrimetiveSlice_SourcePtrPrimetiveSlice    mappingCase = "TargetPrimetiveSliceType_SourcePtrPrimetiveSliceType"
-	TargetPtrPrimetiveSlice_SourcePrimetiveSlice    mappingCase = "TargetPtrPrimetiveSliceType_SourcePrimetiveSliceType"
-	TargetPtrPrimetiveSlice_SourcePtrPrimetiveSlice mappingCase = "TargetPtrPrimetiveSliceType_SourcePtrPrimetiveSliceType"
-	TargetStruct_SourceStruct                       mappingCase = "TargetStructType_SourceStructType"
-	TargetStruct_SourcePtrStruct                    mappingCase = "TargetStructType_SourcePtrStructType"
-	TargetPtrStruct_SourceStruct                    mappingCase = "TargetPtrStructType_SourceStructType"
-	TargetPtrStruct_SourcePtrStruct                 mappingCase = "TargetPtrStructType_SourcePtrStructType"
-	TargetStructSlice_SourceStructSlice             mappingCase = "TargetStructSliceType_SourceStructSliceType"
-	TargetStructSlice_SourcePtrStructSlice          mappingCase = "TargetStructSliceType_SourcePtrStructSliceType"
-	TargetPtrStructSlice_SourceStructSlice          mappingCase = "TargetPtrStructSliceType_SourceStructSliceType"
-	TargetPtrStructSlice_SourcePtrStructSlice       mappingCase = "TargetPtrStructSliceType_SourcePtrStructSliceType"
-)

@@ -9,6 +9,7 @@ import "fmt"
 // StructSliceType,
 // PrimetiveSliceType,
 // PointerType,
+// EnumType
 // )
 type FieldType uint8
 
@@ -16,11 +17,11 @@ type Mapable interface {
 	fieldType() FieldType
 }
 
-func (s *Struct) fieldType() FieldType         { return StructType }
-func (p *Primetive) fieldType() FieldType      { return PrimetiveType }
-func (p *StructSlice) fieldType() FieldType    { return StructSliceType }
-func (p *PrimetiveSlice) fieldType() FieldType { return PrimetiveSliceType }
-func (p *Pointer) fieldType() FieldType        { return PointerType }
+func (s *Struct) fieldType() FieldType    { return StructType }
+func (p *Primetive) fieldType() FieldType { return PrimetiveType }
+func (p *Slice) fieldType() FieldType     { return StructSliceType }
+func (p *Pointer) fieldType() FieldType   { return PointerType }
+func (p *Enum) fieldType() FieldType      { return EnumType }
 
 type Field struct {
 	Owner *Field
@@ -40,7 +41,7 @@ func buildFullName(f *Field) string {
 }
 
 type Pointer struct {
-	Ref Mapable
+	To Mapable
 }
 
 type Struct struct {
@@ -49,16 +50,17 @@ type Struct struct {
 	Fields map[string]*Field
 }
 
-type StructSlice struct {
-	Struct *Struct
+type Slice struct {
+	Of Mapable
 }
 
 type Primetive struct {
 	Type string
 }
 
-type PrimetiveSlice struct {
-	Primetive
+type Enum struct {
+	Name string
+	Path string
 }
 
 type Mapper struct {

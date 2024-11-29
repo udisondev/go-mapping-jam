@@ -22,11 +22,13 @@ const (
 	PrimetiveSliceType
 	// PointerType is a FieldType of type PointerType.
 	PointerType
+	// EnumType is a FieldType of type EnumType.
+	EnumType
 )
 
 var ErrInvalidFieldType = errors.New("not a valid FieldType")
 
-const _FieldTypeName = "StructTypePrimetiveTypeStructSliceTypePrimetiveSliceTypePointerType"
+const _FieldTypeName = "StructTypePrimetiveTypeStructSliceTypePrimetiveSliceTypePointerTypeEnumType"
 
 var _FieldTypeMap = map[FieldType]string{
 	StructType:         _FieldTypeName[0:10],
@@ -34,6 +36,7 @@ var _FieldTypeMap = map[FieldType]string{
 	StructSliceType:    _FieldTypeName[23:38],
 	PrimetiveSliceType: _FieldTypeName[38:56],
 	PointerType:        _FieldTypeName[56:67],
+	EnumType:           _FieldTypeName[67:75],
 }
 
 // String implements the Stringer interface.
@@ -57,6 +60,7 @@ var _FieldTypeValue = map[string]FieldType{
 	_FieldTypeName[23:38]: StructSliceType,
 	_FieldTypeName[38:56]: PrimetiveSliceType,
 	_FieldTypeName[56:67]: PointerType,
+	_FieldTypeName[67:75]: EnumType,
 }
 
 // ParseFieldType attempts to convert a string to a FieldType.
