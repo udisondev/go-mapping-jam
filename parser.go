@@ -11,6 +11,8 @@ import (
 	"regexp"
 	"strings"
 
+	. "github.com/udisondev/go-mapping-jam/mapp"
+	"github.com/udisondev/go-mapping-jam/rule"
 	"golang.org/x/tools/go/packages"
 )
 
@@ -31,7 +33,7 @@ func parse(filePath string) map[string]Mapper {
 	mappersMap := make(map[string]Mapper)
 
 	for _, v := range extractMethods(node) {
-		mappingRules := make(map[RuleType][]Rule)
+		mappingRules := make(map[rule.Type][]rule.Any)
 		if v.Doc != nil {
 			for _, mpr := range v.Doc.List {
 				rules := parseRules(strings.TrimSpace(strings.ReplaceAll(mpr.Text, "//", "")))
@@ -70,14 +72,14 @@ func parse(filePath string) map[string]Mapper {
 			return pks[0]
 		}
 
-		v.initRoot(v.Source, packFunc)
-		v.initRoot(v.Target, packFunc)
+		initRoot(v.Source, packFunc)
+		initRoot(v.Target, packFunc)
 	}
 
 	return mappersMap
 }
 
-func (m *Mapper) initRoot(str Struct, packFunc func(dir string) *packages.Package) {
+func initRoot(str Struct, packFunc func(dir string) *packages.Package) {
 	pkg, ok := pkgs[str.Path]
 	if !ok {
 		pkg = packFunc(dirByPath(str.Path))
@@ -102,7 +104,7 @@ func (m *Mapper) initRoot(str Struct, packFunc func(dir string) *packages.Packag
 	for i := 0; i < structType.NumFields(); i++ {
 		field := structType.Field(i)
 		fieldName := field.Name()
-		str.Fields[fieldName] = m.buildField(nil, fieldName, field)
+		str.Fields[fieldName] = buildField(nil, fieldName, field)
 	}
 }
 
@@ -110,7 +112,7 @@ func dirByPath(p string) string {
 	return strings.ReplaceAll(p, projectName, "./")
 }
 
-func (m *Mapper) buildField(owner *Field, fieldName string, field *types.Var) Field {
+func buildField(owner *Field, fieldName string, field *types.Var) Field {
 	switch t := field.Type().(type) {
 	case *types.Basic:
 		return Field{
@@ -148,7 +150,7 @@ func (m *Mapper) buildField(owner *Field, fieldName string, field *types.Var) Fi
 		for i := 0; i < structType.NumFields(); i++ {
 			subField := structType.Field(i)
 			subFieldName := subField.Name()
-			fs.Desc.(*Struct).Fields[subFieldName] = m.buildField(&fs, subFieldName, subField)
+			fs.Desc.(*Struct).Fields[subFieldName] = buildField(&fs, subFieldName, subField)
 		}
 
 		return fs
@@ -187,7 +189,7 @@ func (m *Mapper) buildField(owner *Field, fieldName string, field *types.Var) Fi
 			for i := 0; i < structType.NumFields(); i++ {
 				subField := structType.Field(i)
 				subFieldName := subField.Name()
-				fs.Desc.(*Slice).Of.(*Struct).Fields[subFieldName] = m.buildField(&fs, subFieldName, subField)
+				fs.Desc.(*Slice).Of.(*Struct).Fields[subFieldName] = buildField(&fs, subFieldName, subField)
 			}
 
 			return fs
@@ -232,7 +234,7 @@ func (m *Mapper) buildField(owner *Field, fieldName string, field *types.Var) Fi
 			for i := 0; i < structType.NumFields(); i++ {
 				subField := structType.Field(i)
 				subFieldName := subField.Name()
-				fs.Desc.(*Pointer).To.(*Struct).Fields[subFieldName] = m.buildField(&fs, subFieldName, subField)
+				fs.Desc.(*Pointer).To.(*Struct).Fields[subFieldName] = buildField(&fs, subFieldName, subField)
 			}
 
 			return fs
@@ -271,7 +273,7 @@ func (m *Mapper) buildField(owner *Field, fieldName string, field *types.Var) Fi
 				for i := 0; i < structType.NumFields(); i++ {
 					subField := structType.Field(i)
 					subFieldName := subField.Name()
-					fs.Desc.(*Struct).Fields[subFieldName] = m.buildField(&fs, subFieldName, subField)
+					fs.Desc.(*Struct).Fields[subFieldName] = buildField(&fs, subFieldName, subField)
 				}
 
 				return fs
@@ -282,8 +284,8 @@ func (m *Mapper) buildField(owner *Field, fieldName string, field *types.Var) Fi
 	panic(fmt.Sprintf("unknown field type: %v", field.Type()))
 }
 
-func parseRules(input string) []Rule {
-	var rules []Rule
+func parseRules(input string) []rule.Any {
+	var rules []rule.Any
 
 	re := regexp.MustCompile(`(\w+)={(.*?)}`)
 	matches := re.FindAllStringSubmatch(input, -1)
@@ -295,7 +297,7 @@ func parseRules(input string) []Rule {
 		ruleType := match[1]
 		ruleData := match[2]
 
-		parser, ok := ruleParsers[ruleType]
+		parser, ok := rule.RuleParsers[ruleType]
 		if !ok {
 			log.Fatalf("unknown rule type: %s", ruleType)
 		}
@@ -307,7 +309,7 @@ func parseRules(input string) []Rule {
 	return rules
 }
 
-func parseQualRule(data string) Rule {
+func parseQualRule(data string) rule.Any {
 	resource := regexp.MustCompile(`source="([^"]+)"`)
 	retarget := regexp.MustCompile(`target="([^"]+)"`)
 	remname := regexp.MustCompile(`mname="([^"]+)"`)
@@ -345,7 +347,7 @@ func parseQualRule(data string) Rule {
 		mpath = custmnpathdata[1]
 	}
 
-	return QualRule{
+	return rule.Qual{
 		SourceName: source,
 		TargetName: target,
 		MName:      mname,
@@ -353,8 +355,8 @@ func parseQualRule(data string) Rule {
 	}
 }
 
-func parseEnumRule(data string) Rule {
-	return EnumRule{}
+func parseEnumRule(data string) rule.Any {
+	return rule.Enum{}
 }
 
 func extractMethods(n ast.Node) []*ast.Field {

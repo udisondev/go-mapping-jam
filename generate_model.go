@@ -1,6 +1,10 @@
 package main
 
-import jen "github.com/dave/jennifer/jen"
+import (
+	jen "github.com/dave/jennifer/jen"
+	. "github.com/udisondev/go-mapping-jam/mapp"
+	"github.com/udisondev/go-mapping-jam/rule"
+)
 
 type generatedMapper struct {
 	generatedFile
@@ -9,7 +13,7 @@ type generatedMapper struct {
 	to        Struct
 	isFromPrt bool
 	isToPtr   bool
-	rules     map[RuleType][]Rule
+	rules     map[rule.Type][]rule.Any
 	*jen.Statement
 	fieldGenMapFuncs map[FieldType]map[FieldType]func(bl mapperBlock, target Field, source Field)
 }

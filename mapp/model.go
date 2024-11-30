@@ -1,7 +1,11 @@
 //go:generate go-enum
-package main
+package mapp
 
-import "fmt"
+import (
+	"fmt"
+
+	"github.com/udisondev/go-mapping-jam/rule"
+)
 
 // FieldType ENUM(
 // Primetive,
@@ -15,13 +19,13 @@ import "fmt"
 type FieldType uint8
 
 type Mapable interface {
-	fieldType() FieldType
+	FieldType() FieldType
 }
 
-func (s Struct) fieldType() FieldType    { return FieldTypeStruct }
-func (p Primetive) fieldType() FieldType { return FieldTypePrimetive }
-func (p Slice) fieldType() FieldType {
-	switch p.Of.fieldType() {
+func (s Struct) FieldType() FieldType    { return FieldTypeStruct }
+func (p Primetive) FieldType() FieldType { return FieldTypePrimetive }
+func (p Slice) FieldType() FieldType {
+	switch p.Of.FieldType() {
 	case FieldTypePrimetive:
 		return FieldTypeSliceOfPrimetive
 	case FieldTypeStruct:
@@ -30,8 +34,8 @@ func (p Slice) fieldType() FieldType {
 		panic(fmt.Sprintf("unsupported type slice of: %T", p.Of))
 	}
 }
-func (p Pointer) fieldType() FieldType {
-	switch p.To.fieldType() {
+func (p Pointer) FieldType() FieldType {
+	switch p.To.FieldType() {
 	case FieldTypePrimetive:
 		return FieldTypePointerToPrimetive
 	case FieldTypeStruct:
@@ -40,7 +44,7 @@ func (p Pointer) fieldType() FieldType {
 		panic(fmt.Sprintf("unsupported type pointer to: %T", p.To))
 	}
 }
-func (p Enum) fieldType() FieldType { return FieldTypeEnum }
+func (p Enum) FieldType() FieldType { return FieldTypeEnum }
 
 type Field struct {
 	Owner *Field
@@ -86,7 +90,7 @@ type Mapper struct {
 	Name   string
 	Source Struct
 	Target Struct
-	Rules  map[RuleType][]Rule
+	Rules  map[rule.Type][]rule.Any
 }
 
 func (s Struct) Hash() string {

@@ -7,6 +7,9 @@ import (
 	"time"
 
 	jen "github.com/dave/jennifer/jen"
+	"github.com/udisondev/go-mapping-jam/cast"
+	. "github.com/udisondev/go-mapping-jam/mapp"
+	"github.com/udisondev/go-mapping-jam/rule"
 )
 
 const charset = "abcdefghijklmnopqrstuvwxyz"
@@ -55,9 +58,9 @@ func (mf mappedField) mapField() {
 		log.Fatalf("source field not found for target: %s", mf.target.FullName())
 	}
 
-	mappingGenFunc, ok := mf.fieldGenMapFuncs[mf.target.Desc.fieldType()][sourceField.Desc.fieldType()]
+	mappingGenFunc, ok := mf.fieldGenMapFuncs[mf.target.Desc.FieldType()][sourceField.Desc.FieldType()]
 	if !ok {
-		panic(fmt.Sprintf("unable to map from '%s' to '%s'", sourceField.Desc.fieldType(), mf.target.Desc.fieldType()))
+		panic(fmt.Sprintf("unable to map from '%s' to '%s'", sourceField.Desc.FieldType(), mf.target.Desc.FieldType()))
 	}
 
 	mappingGenFunc(mf.mapperBlock, mf.target, sourceField)
@@ -82,15 +85,8 @@ func genPrimetiveToPtrPrimetive(bl mapperBlock, target, source Field) {
 }
 
 func genPtrStructToPtrStruct(bl mapperBlock, target, source Field) {
-	nestedSourceStruct, ok := source.Desc.(Pointer).To.(Struct)
-	if !ok {
-		panic("is not a struct")
-	}
-
-	targetField, ok := target.Desc.(Pointer).To.(Struct)
-	if !ok {
-		panic("is not a struct")
-	}
+	nestedSourceStruct := cast.ToPointerToStruct(source.Desc)
+	targetField := cast.ToPointerToStruct(target.Desc)
 
 	hash := nestedSourceStruct.Hash() + targetField.Hash()
 	methodName, ok := bl.submappers[hash]
@@ -123,15 +119,8 @@ func genPtrStructToPtrStruct(bl mapperBlock, target, source Field) {
 }
 
 func genStructToPtrStruct(bl mapperBlock, target, source Field) {
-	nestedSourceStruct, ok := source.Desc.(Struct)
-	if !ok {
-		panic("is not a struct")
-	}
-
-	targetField, ok := target.Desc.(Pointer).To.(Struct)
-	if !ok {
-		panic("is not a struct")
-	}
+	nestedSourceStruct := cast.ToStruct(source.Desc)
+	targetField := cast.ToPointerToStruct(target.Desc)
 
 	hash := nestedSourceStruct.Hash() + targetField.Hash()
 	methodName, ok := bl.submappers[hash]
@@ -157,15 +146,8 @@ func genStructToPtrStruct(bl mapperBlock, target, source Field) {
 }
 
 func genPtrStructToStruct(bl mapperBlock, target, source Field) {
-	nestedSourceStruct, ok := source.Desc.(Pointer).To.(Struct)
-	if !ok {
-		panic("is not a struct")
-	}
-
-	targetField, ok := target.Desc.(Struct)
-	if !ok {
-		panic("is not a struct")
-	}
+	nestedSourceStruct := cast.ToPointerToStruct(source.Desc)
+	targetField := cast.ToStruct(target.Desc)
 
 	hash := nestedSourceStruct.Hash() + targetField.Hash()
 	methodName, ok := bl.submappers[hash]
@@ -196,8 +178,8 @@ func genPtrStructToStruct(bl mapperBlock, target, source Field) {
 }
 
 func genStructToStruct(bl mapperBlock, target, source Field) {
-	nestedSourceStruct, _ := source.Desc.(Struct)
-	hash := nestedSourceStruct.Hash() + target.Desc.(Struct).Hash()
+	nestedSourceStruct := cast.ToStruct(source.Desc)
+	hash := nestedSourceStruct.Hash() + cast.ToStruct(target.Desc).Hash()
 	methodName, ok := bl.submappers[hash]
 	if !ok {
 		methodName = genRandomName(15)
@@ -209,8 +191,8 @@ func genStructToStruct(bl mapperBlock, target, source Field) {
 		sbm := generatedMapper{
 			generatedFile: bl.generatedFile,
 			name:          methodName,
-			from:          source.Desc.(Struct),
-			to:            target.Desc.(Struct),
+			from:          cast.ToStruct(source.Desc),
+			to:            cast.ToStruct(target.Desc),
 			rules:         bl.rules,
 		}
 		sbm.generateMapFunc()
@@ -218,9 +200,9 @@ func genStructToStruct(bl mapperBlock, target, source Field) {
 }
 
 func genStructSliceToStructSlice(bl mapperBlock, target, source Field) {
-	targetStruct := target.Desc.(Slice).Of.(Struct)
+	targetStruct := cast.ToSliceOfStruct(target.Desc)
 
-	nestedSourceStruct := source.Desc.(Slice).Of.(Struct)
+	nestedSourceStruct := cast.ToSliceOfStruct(source.Desc)
 	hash := nestedSourceStruct.Hash() + targetStruct.Hash()
 	methodName, ok := bl.submappers[hash]
 	if !ok {
@@ -250,9 +232,9 @@ func genStructSliceToStructSlice(bl mapperBlock, target, source Field) {
 	}
 }
 
-func (mf mappedField) findQualRule() (QualRule, bool) {
-	for _, v := range mf.rules[RuleTypeQual] {
-		qr, ok := v.(QualRule)
+func (mf mappedField) findQualRule() (rule.Qual, bool) {
+	for _, v := range mf.rules[rule.TypeQual] {
+		qr, ok := v.(rule.Qual)
 		if !ok {
 			panic("is not qual rule")
 		}
@@ -262,7 +244,7 @@ func (mf mappedField) findQualRule() (QualRule, bool) {
 		}
 	}
 
-	return QualRule{}, false
+	return rule.Qual{}, false
 }
 
 func (gm generatedMapper) initBody() {

@@ -4,7 +4,7 @@
 // Build Date:
 // Built By:
 
-package main
+package mapp
 
 import (
 	"errors"
