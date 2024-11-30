@@ -63,7 +63,7 @@ func (mf mappedField) mapField() {
 	mappingGenFunc(mf.mapperBlock, mf.target, sourceField)
 }
 
-func genPrimetivePtrPrimetive(bl mapperBlock, target, source Field) {
+func genPtrPrimetiveToPrimetive(bl mapperBlock, target, source Field) {
 	bl.
 		If(
 			jen.Id("src").Dot(source.Name).Op("!=").Nil(),
@@ -73,15 +73,15 @@ func genPrimetivePtrPrimetive(bl mapperBlock, target, source Field) {
 		)
 }
 
-func genPrimetivePrimetive(bl mapperBlock, target, source Field) {
+func genPrimetiveToPrimetive(bl mapperBlock, target, source Field) {
 	bl.Id("target").Dot(target.Name).Op("=").Id("src").Dot(source.Name)
 }
 
-func genPtrPrimetivePrimetive(bl mapperBlock, target, source Field) {
+func genPrimetiveToPtrPrimetive(bl mapperBlock, target, source Field) {
 	bl.Id("target").Dot(target.Name).Op("=").Add(jen.Op("&")).Id("src").Dot(source.Name)
 }
 
-func genPtrStructPtrStructMapping(bl mapperBlock, target, source Field) {
+func genPtrStructToPtrStruct(bl mapperBlock, target, source Field) {
 	nestedSourceStruct, ok := source.Desc.(Pointer).To.(Struct)
 	if !ok {
 		panic("is not a struct")
@@ -122,7 +122,7 @@ func genPtrStructPtrStructMapping(bl mapperBlock, target, source Field) {
 	}
 }
 
-func genPtrStructStructMapping(bl mapperBlock, target, source Field) {
+func genStructToPtrStruct(bl mapperBlock, target, source Field) {
 	nestedSourceStruct, ok := source.Desc.(Struct)
 	if !ok {
 		panic("is not a struct")
@@ -156,7 +156,7 @@ func genPtrStructStructMapping(bl mapperBlock, target, source Field) {
 	}
 }
 
-func genStructPtrStructMapping(bl mapperBlock, target, source Field) {
+func genPtrStructToStruct(bl mapperBlock, target, source Field) {
 	nestedSourceStruct, ok := source.Desc.(Pointer).To.(Struct)
 	if !ok {
 		panic("is not a struct")
@@ -195,7 +195,7 @@ func genStructPtrStructMapping(bl mapperBlock, target, source Field) {
 	}
 }
 
-func genStructStructMapping(bl mapperBlock, target, source Field) {
+func genStructToStruct(bl mapperBlock, target, source Field) {
 	nestedSourceStruct, _ := source.Desc.(Struct)
 	hash := nestedSourceStruct.Hash() + target.Desc.(Struct).Hash()
 	methodName, ok := bl.submappers[hash]
@@ -217,7 +217,7 @@ func genStructStructMapping(bl mapperBlock, target, source Field) {
 	}
 }
 
-func genStructSliceStructSliceMapping(bl mapperBlock, target, source Field) {
+func genStructSliceToStructSlice(bl mapperBlock, target, source Field) {
 	targetStruct := target.Desc.(Slice).Of.(Struct)
 
 	nestedSourceStruct := source.Desc.(Slice).Of.(Struct)
@@ -293,29 +293,29 @@ func generateCodeWithJennifer(outputFile string, mapFuncs map[string]Mapper) {
 
 	fieldGenMap := map[FieldType]map[FieldType]func(bl mapperBlock, target Field, source Field){
 		FieldTypePrimetive: {
-			FieldTypePrimetive:          genPrimetivePrimetive,
-			FieldTypePointerToPrimetive: genPrimetivePtrPrimetive,
+			FieldTypePrimetive:          genPrimetiveToPrimetive,
+			FieldTypePointerToPrimetive: genPtrPrimetiveToPrimetive,
 		},
 		FieldTypeStruct: {
-			FieldTypeStruct:          genStructStructMapping,
-			FieldTypePointerToStruct: genStructPtrStructMapping,
+			FieldTypeStruct:          genStructToStruct,
+			FieldTypePointerToStruct: genPtrStructToStruct,
 		},
 		FieldTypeEnum: {
-			FieldTypeEnum: genPrimetivePrimetive,
+			FieldTypeEnum: genPrimetiveToPrimetive,
 		},
 		FieldTypeSliceOfStruct: {
-			FieldTypeSliceOfStruct: genStructSliceStructSliceMapping,
+			FieldTypeSliceOfStruct: genStructSliceToStructSlice,
 		},
 		FieldTypeSliceOfPrimetive: {
-			FieldTypeSliceOfPrimetive: genPrimetivePrimetive,
+			FieldTypeSliceOfPrimetive: genPrimetiveToPrimetive,
 		},
 		FieldTypePointerToPrimetive: {
-			FieldTypePrimetive:          genPtrPrimetivePrimetive,
-			FieldTypePointerToPrimetive: genPrimetivePrimetive,
+			FieldTypePrimetive:          genPrimetiveToPtrPrimetive,
+			FieldTypePointerToPrimetive: genPrimetiveToPrimetive,
 		},
 		FieldTypePointerToStruct: {
-			FieldTypePointerToStruct: genPtrStructPtrStructMapping,
-			FieldTypeStruct:          genPtrStructStructMapping,
+			FieldTypePointerToStruct: genPtrStructToPtrStruct,
+			FieldTypeStruct:          genStructToPtrStruct,
 		},
 	}
 
