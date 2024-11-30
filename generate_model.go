@@ -3,31 +3,29 @@ package main
 import jen "github.com/dave/jennifer/jen"
 
 type generatedMapper struct {
-	*generatedFile
-	name       string
-	from       *Struct
-	to         *Struct
-	isFromPrt  bool
-	isToPtr    bool
-	rules      map[RuleType][]Rule
+	generatedFile
+	name      string
+	from      Struct
+	to        Struct
+	isFromPrt bool
+	isToPtr   bool
+	rules     map[RuleType][]Rule
 	*jen.Statement
-	fieldGenMapFuncs map[FieldType]map[FieldType]func(bl *mapperBlock, target *Field, source *Field)
+	fieldGenMapFuncs map[FieldType]map[FieldType]func(bl mapperBlock, target Field, source Field)
 }
 
 type generatedFile struct {
-	submappers  map[string]string
+	submappers map[string]string
 }
 
 type mapperBlock struct {
-	from  func() *Struct
-	to    func() *Struct
-	*generatedMapper
+	generatedMapper
 	*jen.Group
 }
 
 type mappedField struct {
-	name       string
-	target     *Field
-	source     func() *Struct
-	*mapperBlock
+	name   string
+	target Field
+	source Struct
+	mapperBlock
 }

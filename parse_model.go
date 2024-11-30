@@ -18,9 +18,9 @@ type Mapable interface {
 	fieldType() FieldType
 }
 
-func (s *Struct) fieldType() FieldType    { return FieldTypeStruct }
-func (p *Primetive) fieldType() FieldType { return FieldTypePrimetive }
-func (p *Slice) fieldType() FieldType {
+func (s Struct) fieldType() FieldType    { return FieldTypeStruct }
+func (p Primetive) fieldType() FieldType { return FieldTypePrimetive }
+func (p Slice) fieldType() FieldType {
 	switch p.Of.fieldType() {
 	case FieldTypePrimetive:
 		return FieldTypeSliceOfPrimetive
@@ -30,7 +30,7 @@ func (p *Slice) fieldType() FieldType {
 		panic(fmt.Sprintf("unsupported type slice of: %T", p.Of))
 	}
 }
-func (p *Pointer) fieldType() FieldType {
+func (p Pointer) fieldType() FieldType {
 	switch p.To.fieldType() {
 	case FieldTypePrimetive:
 		return FieldTypePointerToPrimetive
@@ -40,7 +40,7 @@ func (p *Pointer) fieldType() FieldType {
 		panic(fmt.Sprintf("unsupported type pointer to: %T", p.To))
 	}
 }
-func (p *Enum) fieldType() FieldType { return FieldTypeEnum }
+func (p Enum) fieldType() FieldType { return FieldTypeEnum }
 
 type Field struct {
 	Owner *Field
@@ -48,15 +48,15 @@ type Field struct {
 	Desc  Mapable
 }
 
-func (f *Field) FullName() string {
+func (f Field) FullName() string {
 	return buildFullName(f)
 }
 
-func buildFullName(f *Field) string {
+func buildFullName(f Field) string {
 	if f.Owner == nil {
 		return "." + f.Name
 	}
-	return fmt.Sprintf("%s.%s", buildFullName(f.Owner), f.Name)
+	return fmt.Sprintf("%s.%s", buildFullName(*f.Owner), f.Name)
 }
 
 type Pointer struct {
@@ -66,7 +66,7 @@ type Pointer struct {
 type Struct struct {
 	Path   string
 	Name   string
-	Fields map[string]*Field
+	Fields map[string]Field
 }
 
 type Slice struct {
@@ -84,8 +84,8 @@ type Enum struct {
 
 type Mapper struct {
 	Name   string
-	Source *Struct
-	Target *Struct
+	Source Struct
+	Target Struct
 	Rules  map[RuleType][]Rule
 }
 
@@ -93,4 +93,3 @@ func (s Struct) Hash() string {
 	return s.Path + "." + s.Name
 }
 
-var mappersMap = make(map[string]Mapper)

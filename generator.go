@@ -11,20 +11,20 @@ import (
 
 const charset = "abcdefghijklmnopqrstuvwxyz"
 
-func (gm *generatedMapper) generateMapFunc() {
+func (gm generatedMapper) generateMapFunc() {
 	gm.initSignature()
 	gm.initBody()
 }
 
-func (bl *mapperBlock) initTarget() {
-	if bl.to().Path == currentPath {
-		bl.Id("target").Op(":=").Id(bl.to().Name + "{}")
+func (bl mapperBlock) initTarget() {
+	if bl.to.Path == currentPath {
+		bl.Id("target").Op(":=").Id(bl.to.Name + "{}")
 	} else {
-		bl.Id("target").Op(":=").Qual(bl.to().Path, bl.to().Name+"{}")
+		bl.Id("target").Op(":=").Qual(bl.to.Path, bl.to.Name+"{}")
 	}
 }
 
-func (mf *mappedField) mapField() {
+func (mf mappedField) mapField() {
 	sourceFieldName := mf.name
 	if qr, ok := mf.findQualRule(); ok && qr.SourceName != "" && qr.MName == "" {
 		sourceFieldName = qr.SourceName
@@ -50,7 +50,7 @@ func (mf *mappedField) mapField() {
 		return
 	}
 
-	sourceField, ok := mf.source().Fields[sourceFieldName]
+	sourceField, ok := mf.source.Fields[sourceFieldName]
 	if !ok {
 		log.Fatalf("source field not found for target: %s", mf.target.FullName())
 	}
@@ -63,31 +63,31 @@ func (mf *mappedField) mapField() {
 	mappingGenFunc(mf.mapperBlock, mf.target, sourceField)
 }
 
-func genPrimetivePtrPrimetive(bl *mapperBlock, target, source *Field) {
+func genPrimetivePtrPrimetive(bl mapperBlock, target, source Field) {
 	bl.
 		If(
 			jen.Id("src").Dot(source.Name).Op("!=").Nil(),
 		).
 		Block(
-			jen.Id("target").Dot(target.Name).Op("=").Add(jen.Op("*")).Id("src").Dot(source.Name),
+			jen.Id("target").Dot(target.Name).Op("=").Add(jen.Op("")).Id("src").Dot(source.Name),
 		)
 }
 
-func genPrimetivePrimetive(bl *mapperBlock, target, source *Field) {
+func genPrimetivePrimetive(bl mapperBlock, target, source Field) {
 	bl.Id("target").Dot(target.Name).Op("=").Id("src").Dot(source.Name)
 }
 
-func genPtrPrimetivePrimetive(bl *mapperBlock, target, source *Field) {
+func genPtrPrimetivePrimetive(bl mapperBlock, target, source Field) {
 	bl.Id("target").Dot(target.Name).Op("=").Add(jen.Op("&")).Id("src").Dot(source.Name)
 }
 
-func genPtrStructPtrStructMapping(bl *mapperBlock, target, source *Field) {
-	nestedSourceStruct, ok := source.Desc.(*Pointer).To.(*Struct)
+func genPtrStructPtrStructMapping(bl mapperBlock, target, source Field) {
+	nestedSourceStruct, ok := source.Desc.(Pointer).To.(Struct)
 	if !ok {
 		panic("is not a struct")
 	}
 
-	targetField, ok := target.Desc.(*Pointer).To.(*Struct)
+	targetField, ok := target.Desc.(Pointer).To.(Struct)
 	if !ok {
 		panic("is not a struct")
 	}
@@ -104,7 +104,7 @@ func genPtrStructPtrStructMapping(bl *mapperBlock, target, source *Field) {
 			jen.Id("src").Dot(source.Name).Op("!=").Nil(),
 		).
 		Block(
-			jen.Id(methodName+"Result").Op(":=").Id(methodName).Call(jen.Add(jen.Op("*").Id("src").Dot(source.Name))),
+			jen.Id(methodName+"Result").Op(":=").Id(methodName).Call(jen.Add(jen.Op("").Id("src").Dot(source.Name))),
 			jen.Id("target").Dot(target.Name).Op("=").Add(jen.Op("&")).Id(methodName+"Result"),
 		)
 
@@ -122,13 +122,13 @@ func genPtrStructPtrStructMapping(bl *mapperBlock, target, source *Field) {
 	}
 }
 
-func genPtrStructStructMapping(bl *mapperBlock, target, source *Field) {
-	nestedSourceStruct, ok := source.Desc.(*Struct)
+func genPtrStructStructMapping(bl mapperBlock, target, source Field) {
+	nestedSourceStruct, ok := source.Desc.(Struct)
 	if !ok {
 		panic("is not a struct")
 	}
 
-	targetField, ok := target.Desc.(*Pointer).To.(*Struct)
+	targetField, ok := target.Desc.(Pointer).To.(Struct)
 	if !ok {
 		panic("is not a struct")
 	}
@@ -156,13 +156,13 @@ func genPtrStructStructMapping(bl *mapperBlock, target, source *Field) {
 	}
 }
 
-func genStructPtrStructMapping(bl *mapperBlock, target, source *Field) {
-	nestedSourceStruct, ok := source.Desc.(*Pointer).To.(*Struct)
+func genStructPtrStructMapping(bl mapperBlock, target, source Field) {
+	nestedSourceStruct, ok := source.Desc.(Pointer).To.(Struct)
 	if !ok {
 		panic("is not a struct")
 	}
 
-	targetField, ok := target.Desc.(*Struct)
+	targetField, ok := target.Desc.(Struct)
 	if !ok {
 		panic("is not a struct")
 	}
@@ -179,7 +179,7 @@ func genStructPtrStructMapping(bl *mapperBlock, target, source *Field) {
 			jen.Id("src").Dot(source.Name).Op("!=").Nil(),
 		).
 		Block(
-			jen.Id("target").Dot(target.Name).Op("=").Id(methodName).Call(jen.Add(jen.Op("*").Id("src").Dot(source.Name))),
+			jen.Id("target").Dot(target.Name).Op("=").Id(methodName).Call(jen.Add(jen.Op("").Id("src").Dot(source.Name))),
 		)
 
 	if !ok {
@@ -195,9 +195,9 @@ func genStructPtrStructMapping(bl *mapperBlock, target, source *Field) {
 	}
 }
 
-func genStructStructMapping(bl *mapperBlock, target, source *Field) {
-	nestedSourceStruct, _ := source.Desc.(*Struct)
-	hash := nestedSourceStruct.Hash() + target.Desc.(*Struct).Hash()
+func genStructStructMapping(bl mapperBlock, target, source Field) {
+	nestedSourceStruct, _ := source.Desc.(Struct)
+	hash := nestedSourceStruct.Hash() + target.Desc.(Struct).Hash()
 	methodName, ok := bl.submappers[hash]
 	if !ok {
 		methodName = genRandomName(15)
@@ -209,18 +209,18 @@ func genStructStructMapping(bl *mapperBlock, target, source *Field) {
 		sbm := generatedMapper{
 			generatedFile: bl.generatedFile,
 			name:          methodName,
-			from:          source.Desc.(*Struct),
-			to:            target.Desc.(*Struct),
+			from:          source.Desc.(Struct),
+			to:            target.Desc.(Struct),
 			rules:         bl.rules,
 		}
 		sbm.generateMapFunc()
 	}
 }
 
-func genStructSliceStructSliceMapping(bl *mapperBlock, target, source *Field) {
-	targetStruct := target.Desc.(*Slice).Of.(*Struct)
+func genStructSliceStructSliceMapping(bl mapperBlock, target, source Field) {
+	targetStruct := target.Desc.(Slice).Of.(Struct)
 
-	nestedSourceStruct := source.Desc.(*Slice).Of.(*Struct)
+	nestedSourceStruct := source.Desc.(Slice).Of.(Struct)
 	hash := nestedSourceStruct.Hash() + targetStruct.Hash()
 	methodName, ok := bl.submappers[hash]
 	if !ok {
@@ -250,7 +250,7 @@ func genStructSliceStructSliceMapping(bl *mapperBlock, target, source *Field) {
 	}
 }
 
-func (mf *mappedField) findQualRule() (QualRule, bool) {
+func (mf mappedField) findQualRule() (QualRule, bool) {
 	for _, v := range mf.rules[RuleTypeQual] {
 		qr, ok := v.(QualRule)
 		if !ok {
@@ -265,11 +265,9 @@ func (mf *mappedField) findQualRule() (QualRule, bool) {
 	return QualRule{}, false
 }
 
-func (gm *generatedMapper) initBody() {
+func (gm generatedMapper) initBody() {
 	gm.BlockFunc(func(gr *jen.Group) {
 		gbl := mapperBlock{
-			from:            func() *Struct { return gm.from },
-			to:              func() *Struct { return gm.to },
 			generatedMapper: gm,
 			Group:           gr,
 		}
@@ -278,8 +276,8 @@ func (gm *generatedMapper) initBody() {
 			field := mappedField{
 				name:        n,
 				target:      f,
-				source:      func() *Struct { return gm.from },
-				mapperBlock: &gbl,
+				source:      gm.from,
+				mapperBlock: gbl,
 			}
 			field.mapField()
 		}
@@ -293,7 +291,7 @@ func generateCodeWithJennifer(outputFile string, mapFuncs map[string]Mapper) {
 		submappers: make(map[string]string),
 	}
 
-	fieldGenMap := map[FieldType]map[FieldType]func(bl *mapperBlock, target *Field, source *Field){
+	fieldGenMap := map[FieldType]map[FieldType]func(bl mapperBlock, target Field, source Field){
 		FieldTypePrimetive: {
 			FieldTypePrimetive:          genPrimetivePrimetive,
 			FieldTypePointerToPrimetive: genPrimetivePtrPrimetive,
@@ -325,7 +323,7 @@ func generateCodeWithJennifer(outputFile string, mapFuncs map[string]Mapper) {
 
 	for _, mapFunc := range mapFuncs {
 		gm := generatedMapper{
-			generatedFile:    &g,
+			generatedFile:    g,
 			name:             mapFunc.Name,
 			from:             mapFunc.Source,
 			to:               mapFunc.Target,
@@ -341,7 +339,7 @@ func generateCodeWithJennifer(outputFile string, mapFuncs map[string]Mapper) {
 	}
 }
 
-func (gm *generatedMapper) initSignature() {
+func (gm generatedMapper) initSignature() {
 	gm.Statement = gm.Func().Id(gm.name)
 	if gm.from.Path == currentPath {
 		gm.Statement.Params(jen.Id("src").Id(gm.from.Name))
