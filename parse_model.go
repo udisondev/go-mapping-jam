@@ -1,15 +1,16 @@
-//go:generate go-enum --noprefix
+//go:generate go-enum
 package main
 
 import "fmt"
 
 // FieldType ENUM(
-// StructType,
-// PrimetiveType,
-// StructSliceType,
-// PrimetiveSliceType,
-// PointerType,
-// EnumType
+// Primetive,
+// Struct,
+// Enum
+// SliceOfStruct,
+// SliceOfPrimetive,
+// PointerToPrimetive
+// PointerToStruct
 // )
 type FieldType uint8
 
@@ -17,11 +18,29 @@ type Mapable interface {
 	fieldType() FieldType
 }
 
-func (s *Struct) fieldType() FieldType    { return StructType }
-func (p *Primetive) fieldType() FieldType { return PrimetiveType }
-func (p *Slice) fieldType() FieldType     { return StructSliceType }
-func (p *Pointer) fieldType() FieldType   { return PointerType }
-func (p *Enum) fieldType() FieldType      { return EnumType }
+func (s *Struct) fieldType() FieldType    { return FieldTypeStruct }
+func (p *Primetive) fieldType() FieldType { return FieldTypePrimetive }
+func (p *Slice) fieldType() FieldType {
+	switch p.Of.fieldType() {
+	case FieldTypePrimetive:
+		return FieldTypeSliceOfPrimetive
+	case FieldTypeStruct:
+		return FieldTypeSliceOfStruct
+	default:
+		panic(fmt.Sprintf("unsupported type slice of: %T", p.Of))
+	}
+}
+func (p *Pointer) fieldType() FieldType {
+	switch p.To.fieldType() {
+	case FieldTypePrimetive:
+		return FieldTypePointerToPrimetive
+	case FieldTypeStruct:
+		return FieldTypePointerToStruct
+	default:
+		panic(fmt.Sprintf("unsupported type pointer to: %T", p.To))
+	}
+}
+func (p *Enum) fieldType() FieldType { return FieldTypeEnum }
 
 type Field struct {
 	Owner *Field

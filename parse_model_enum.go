@@ -12,31 +12,34 @@ import (
 )
 
 const (
-	// StructType is a FieldType of type StructType.
-	StructType FieldType = iota
-	// PrimetiveType is a FieldType of type PrimetiveType.
-	PrimetiveType
-	// StructSliceType is a FieldType of type StructSliceType.
-	StructSliceType
-	// PrimetiveSliceType is a FieldType of type PrimetiveSliceType.
-	PrimetiveSliceType
-	// PointerType is a FieldType of type PointerType.
-	PointerType
-	// EnumType is a FieldType of type EnumType.
-	EnumType
+	// FieldTypePrimetive is a FieldType of type Primetive.
+	FieldTypePrimetive FieldType = iota
+	// FieldTypeStruct is a FieldType of type Struct.
+	FieldTypeStruct
+	// FieldTypeEnum is a FieldType of type Enum.
+	FieldTypeEnum
+	// FieldTypeSliceOfStruct is a FieldType of type SliceOfStruct.
+	FieldTypeSliceOfStruct
+	// FieldTypeSliceOfPrimetive is a FieldType of type SliceOfPrimetive.
+	FieldTypeSliceOfPrimetive
+	// FieldTypePointerToPrimetive is a FieldType of type PointerToPrimetive.
+	FieldTypePointerToPrimetive
+	// FieldTypePointerToStruct is a FieldType of type PointerToStruct.
+	FieldTypePointerToStruct
 )
 
 var ErrInvalidFieldType = errors.New("not a valid FieldType")
 
-const _FieldTypeName = "StructTypePrimetiveTypeStructSliceTypePrimetiveSliceTypePointerTypeEnumType"
+const _FieldTypeName = "PrimetiveStructEnumSliceOfStructSliceOfPrimetivePointerToPrimetivePointerToStruct"
 
 var _FieldTypeMap = map[FieldType]string{
-	StructType:         _FieldTypeName[0:10],
-	PrimetiveType:      _FieldTypeName[10:23],
-	StructSliceType:    _FieldTypeName[23:38],
-	PrimetiveSliceType: _FieldTypeName[38:56],
-	PointerType:        _FieldTypeName[56:67],
-	EnumType:           _FieldTypeName[67:75],
+	FieldTypePrimetive:          _FieldTypeName[0:9],
+	FieldTypeStruct:             _FieldTypeName[9:15],
+	FieldTypeEnum:               _FieldTypeName[15:19],
+	FieldTypeSliceOfStruct:      _FieldTypeName[19:32],
+	FieldTypeSliceOfPrimetive:   _FieldTypeName[32:48],
+	FieldTypePointerToPrimetive: _FieldTypeName[48:66],
+	FieldTypePointerToStruct:    _FieldTypeName[66:81],
 }
 
 // String implements the Stringer interface.
@@ -55,12 +58,13 @@ func (x FieldType) IsValid() bool {
 }
 
 var _FieldTypeValue = map[string]FieldType{
-	_FieldTypeName[0:10]:  StructType,
-	_FieldTypeName[10:23]: PrimetiveType,
-	_FieldTypeName[23:38]: StructSliceType,
-	_FieldTypeName[38:56]: PrimetiveSliceType,
-	_FieldTypeName[56:67]: PointerType,
-	_FieldTypeName[67:75]: EnumType,
+	_FieldTypeName[0:9]:   FieldTypePrimetive,
+	_FieldTypeName[9:15]:  FieldTypeStruct,
+	_FieldTypeName[15:19]: FieldTypeEnum,
+	_FieldTypeName[19:32]: FieldTypeSliceOfStruct,
+	_FieldTypeName[32:48]: FieldTypeSliceOfPrimetive,
+	_FieldTypeName[48:66]: FieldTypePointerToPrimetive,
+	_FieldTypeName[66:81]: FieldTypePointerToStruct,
 }
 
 // ParseFieldType attempts to convert a string to a FieldType.
