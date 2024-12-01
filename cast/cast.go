@@ -1,34 +1,34 @@
 package cast
 
-import (
-	"fmt"
+// import (
+// 	"fmt"
 
-	. "github.com/udisondev/go-mapping-jam/mapp"
-)
+// 	. "github.com/udisondev/go-mapping-jam/mapp"
+// )
 
-func ToStruct(v any) Struct {
-	str, ok := v.(Struct)
-	if !ok {
-		panic(fmt.Sprintf("'%T' is not a struct", v))
-	}
+// func ToStruct(v any) Struct {
+// 	str, ok := v.(Struct)
+// 	if !ok {
+// 		panic(fmt.Sprintf("'%T' is not a struct", v))
+// 	}
 
-	return str
-}
+// 	return str
+// }
 
-func ToPointerToStruct(v any) Struct {
-	ptr, ok := v.(Pointer)
-	if !ok {
-		panic(fmt.Sprintf("'%T' is not a pointer", v))
-	}
+// func ToPointerToStruct(v any) Struct {
+// 	ptr, ok := v.(Pointer)
+// 	if !ok {
+// 		panic(fmt.Sprintf("'%T' is not a pointer", v))
+// 	}
 
-	return ToStruct(ptr.To)
-}
+// 	return ToStruct(ptr.To)
+// }
 
-func ToSliceOfStruct(v any) Struct {
-	slc, ok := v.(Slice)
-	if !ok {
-		panic(fmt.Sprintf("'%T' is not a pointer", v))
-	}
+// func ToSliceOfStruct(v any) Struct {
+// 	slc, ok := v.(Slice)
+// 	if !ok {
+// 		panic(fmt.Sprintf("'%T' is not a pointer", v))
+// 	}
 
-	return ToStruct(slc.Of)
-}
+// 	return ToStruct(slc.Of)
+// }
