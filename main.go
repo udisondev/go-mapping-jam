@@ -59,7 +59,6 @@ func check(mapperFile *mapp.MapperFile) {
 		}
 		println("----------------------------")
 
-
 		target := m.Target()
 		tfields := target.Fields()
 		fmt.Println("target fields: ")
@@ -71,7 +70,7 @@ func check(mapperFile *mapp.MapperFile) {
 }
 
 func deepFields(f mapp.Field) {
-	fmt.Printf("inner field: %s\n", f.FullName())
+	fmt.Printf("inner field: %s type: %s\n", f.FullName(), f.Type().ShortType())
 	fields := f.Fields()
 	if len(fields) == 0 {
 		return

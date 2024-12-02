@@ -2,27 +2,48 @@
 package mapp
 
 import (
-	"go/token"
+	"fmt"
 	"go/types"
 	"strings"
-
-	"golang.org/x/tools/go/packages"
 )
 
-// FieldType ENUM(
-// Basic,
-// Struct,
-// Slice,
-// PointerToBasic,
-// PointerToStruct,
-// PointerToSlice,
-// )
+type BasicType struct {
+	*types.Basic
+}
+
+type NamedType struct {
+	*types.Named
+}
+
+type StructType struct {
+	*types.Struct
+}
+
+type PointerType struct {
+	*types.Pointer
+}
+
+type SliceType struct {
+	*types.Slice
+}
+
+// FieldType ENUM(basic, named, struct, pointer, slice)
 type FieldType uint8
 
+type TypedField interface {
+	ShortType() FieldType
+}
+
+func (t BasicType) ShortType() FieldType   { return FieldTypeBasic }
+func (t NamedType) ShortType() FieldType   { return FieldTypeNamed }
+func (t StructType) ShortType() FieldType  { return FieldTypeStruct }
+func (t PointerType) ShortType() FieldType { return FieldTypePointer }
+func (t SliceType) ShortType() FieldType   { return FieldTypeSlice }
+
 type Field struct {
-	spec  *types.Var
-	owner *types.Struct
-	path  string
+	spec      *types.Var
+	owner     *types.Struct
+	fieldPath string
 }
 
 func (f *Field) Name() string {
@@ -30,7 +51,7 @@ func (f *Field) Name() string {
 }
 
 func (f *Field) FullName() string {
-	return f.path + "." + f.Name()
+	return f.fieldPath + "." + f.Name()
 }
 
 func (f *Field) Fields() []Field {
@@ -46,42 +67,34 @@ func (f *Field) Fields() []Field {
 		path := ft.Obj().Pkg().Path()
 		splitedType := strings.Split(f.spec.Origin().Type().String(), ".")
 		name := splitedType[len(splitedType)-1]
-		return f.returnStructFields(path, name)
+		return extractFieldsFromStruct(f.FullName(), path, name)
 	case *types.Pointer:
 		switch ft.Underlying().(type) {
 		case *types.Struct:
-			f.returnStructFields(f.spec.Pkg().Path(), f.spec.Type().String())
+			extractFieldsFromStruct(f.FullName(), f.spec.Pkg().Path(), f.spec.Type().String())
 		}
 	}
 
 	return nil
 }
 
-func (f *Field) returnStructFields(path, typeName string) []Field {
-	cfg := &packages.Config{
-		Mode: packages.NeedTypes | packages.NeedImports | packages.NeedSyntax,
-		Fset: token.NewFileSet(),
+func (f *Field) Type() TypedField {
+	switch ft := f.spec.Type().(type) {
+	case *types.Basic:
+		return BasicType{Basic: ft}
+	case *types.Named:
+		strt, isStruct := ft.Underlying().(*types.Struct)
+		if isStruct {
+			return StructType{Struct: strt}
+		}
+		return NamedType{Named: ft}
+	case *types.Struct:
+		return StructType{Struct: ft}
+	case *types.Pointer:
+		return PointerType{Pointer: ft}
+	case *types.Slice:
+		return SliceType{Slice: ft}
+	default:
+		panic(fmt.Sprintf("unsupported field type: %T", f.spec.Type()))
 	}
-	pkgs, err := packages.Load(cfg, path)
-	if err != nil {
-		panic(err)
-	}
-	pkg := pkgs[0]
-
-	obj := pkg.Types.Scope().Lookup(typeName)
-	str, ok := obj.Type().Underlying().(*types.Struct)
-	if !ok {
-		return nil
-	}
-
-	fields := make([]Field, 0, str.NumFields())
-	for i := 0; i < str.NumFields(); i++ {
-		fields = append(fields, Field{
-			spec:  str.Field(i),
-			owner: str,
-			path:  f.FullName(),
-		})
-	}
-
-	return fields
 }
