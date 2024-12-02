@@ -76,6 +76,6 @@ func (m *Mapper) Source() Source {
 func (m *Mapper) Target() Target {
 	return Target{
 		spec: m.Results()[0].spec,
-		Result: m.Results()[0],
+		r: m.Results()[0],
 	}
 }

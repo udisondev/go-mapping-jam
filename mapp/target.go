@@ -11,7 +11,15 @@ import (
 
 type Target struct {
 	spec *ast.Field
-	Result
+	r Result
+}
+
+func (t *Target) Name() string {
+	name := t.r.Name()
+	if name != "" {
+		return name
+	}
+	return "t"
 }
 
 func (t *Target) Fields() []Field {
@@ -19,14 +27,14 @@ func (t *Target) Fields() []Field {
 		Mode: packages.NeedTypes | packages.NeedImports | packages.NeedSyntax,
 		Fset: token.NewFileSet(),
 	}
-	path := t.Path()
+	path := t.r.Path()
 	pkgs, err := packages.Load(cfg, path)
 	if err != nil {
 		panic(err)
 	}
 	pkg := pkgs[0]
 
-	_, name := t.Type()
+	_, name := t.r.Type()
 	obj := pkg.Types.Scope().Lookup(name)
 	str, ok := obj.Type().Underlying().(*types.Struct)
 	if !ok {
