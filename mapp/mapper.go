@@ -1,11 +1,13 @@
 package mapp
 
 import (
+	"fmt"
 	"go/ast"
 	"regexp"
+	"strings"
 )
 
-var ruleReg = regexp.MustCompile(`^@(qual|enum)=`)
+var ruleReg = regexp.MustCompile(`^@(qual|enum|ignore)=`)
 
 type Mapper struct {
 	spec    *ast.Field
@@ -28,10 +30,16 @@ func (m *Mapper) Rules() []Rule {
 	rules := []Rule{}
 	for _, c := range m.Comments() {
 		val := c.Value()
+		if !strings.HasPrefix(val, "@") {
+			continue
+		}
+
 		if ruleReg.MatchString(val) {
 			rules = append(rules, Rule{
 				spec: val,
 			})
+		} else {
+			panic(fmt.Sprintf("unsupported rule: %s", val))
 		}
 	}
 
