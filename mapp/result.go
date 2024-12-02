@@ -3,6 +3,7 @@ package mapp
 import (
 	"fmt"
 	"go/ast"
+	"strings"
 )
 
 type Result struct {
@@ -15,7 +16,7 @@ func (p *Result) Name() string {
 	if len(p.spec.Names) == 0 {
 		return ""
 	}
-	
+
 	return p.spec.Names[0].Name
 }
 
@@ -39,7 +40,7 @@ func (p *Result) Path() string {
 
 	for _, i := range p.imports {
 		if i.Alias() == alias {
-			return i.Path()
+			return strings.ReplaceAll(i.Path(), "\"", "")
 		}
 	}
 

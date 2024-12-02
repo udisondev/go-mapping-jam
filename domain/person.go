@@ -11,6 +11,7 @@ type Person struct {
 	LastName string
 	MiddleName string
 	Age *int
+	MainAccount external.Account
 	Account []external.Account
 	Profile *Profile
 	Type PersonType

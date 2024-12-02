@@ -21,6 +21,7 @@ type Mapper interface {
 	//@qual={source="Number" target=".Profile.Phone"}
 	MapPersonToDTO(p domain.Person) (d.Person, error)
 
+	//@emapper
 	//@enum={Simple:Simple Important:Important}
 	MapPersonTypeToDto(pt domain.PersonType) d.PersonType
 

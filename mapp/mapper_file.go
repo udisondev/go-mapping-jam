@@ -2,6 +2,7 @@ package mapp
 
 import (
 	"go/ast"
+	"strings"
 )
 
 type MapperFile struct {
@@ -35,9 +36,16 @@ func (mf *MapperFile) Mappers() []Mapper {
 		}
 
 		imports := mf.Imports()
+	searchMethodLoop:
 		for _, v := range iface.Methods.List {
+			for _, d := range v.Doc.List {
+				if strings.Contains(d.Text, "@emapper") {
+					continue searchMethodLoop
+				}
+			}
+
 			methodList = append(methodList, Mapper{
-				spec: v,
+				spec:    v,
 				imports: imports,
 			})
 		}

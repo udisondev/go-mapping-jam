@@ -27,17 +27,17 @@ func check(mapperFile *mapp.MapperFile) {
 	println("----------------------------")
 	mappers := mapperFile.Mappers()
 	for _, m := range mappers {
-		fmt.Printf("m.Name(): %v\n", m.Name())
+		fmt.Printf("mapper.Name(): %v\n", m.Name())
 		params := m.Params()
 		for _, p := range params {
-			fmt.Printf("p.Name(): %v\n", p.Name())
+			fmt.Printf("param.Name(): %v\n", p.Name())
 			pack, t := p.Type()
-			fmt.Println("p.Type():", pack, t)
-			fmt.Printf("p.Path(): %v\n", p.Path())
+			fmt.Println("param.Type():", pack, t)
+			fmt.Printf("param.Path(): %v\n", p.Path())
 		}
 		comments := m.Comments()
 		for _, c := range comments {
-			fmt.Printf("c.Value(): %v\n", c.Value())
+			fmt.Printf("comment.Value(): %v\n", c.Value())
 		}
 
 		for _, r := range m.Rules() {
@@ -45,11 +45,38 @@ func check(mapperFile *mapp.MapperFile) {
 		}
 
 		for _, r := range m.Results() {
-			fmt.Printf("r.Name(): %v\n", r.Name())
+			fmt.Printf("rule.Name(): %v\n", r.Name())
 			pack, t := r.Type()
-			fmt.Println("r.Type():", pack, t)
-			fmt.Printf("r.Path(): %v\n", r.Path())
+			fmt.Println("rule.Type():", pack, t)
+			fmt.Printf("rtule.Path(): %v\n", r.Path())
+		}
+
+		src := m.Source()
+		sfields := src.Fields()
+		fmt.Println("Source fields: ")
+		for _, f := range sfields {
+			deepFields(f)
 		}
 		println("----------------------------")
+
+
+		target := m.Target()
+		tfields := target.Fields()
+		fmt.Println("target fields: ")
+		for _, f := range tfields {
+			deepFields(f)
+		}
+		println("----------------------------")
+	}
+}
+
+func deepFields(f mapp.Field) {
+	fmt.Printf("inner field: %s\n", f.FullName())
+	fields := f.Fields()
+	if len(fields) == 0 {
+		return
+	}
+	for _, ff := range fields {
+		deepFields(ff)
 	}
 }

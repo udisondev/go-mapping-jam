@@ -65,3 +65,17 @@ func (m *Mapper) Results() []Result {
 
 	return params
 }
+
+func (m *Mapper) Source() Source {
+	return Source{
+		spec: m.Params()[0].spec,
+		Param: m.Params()[0],
+	}
+}
+
+func (m *Mapper) Target() Target {
+	return Target{
+		spec: m.Results()[0].spec,
+		Result: m.Results()[0],
+	}
+}

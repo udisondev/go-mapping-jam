@@ -3,6 +3,7 @@ package mapp
 import (
 	"fmt"
 	"go/ast"
+	"strings"
 )
 
 type Param struct {
@@ -34,7 +35,7 @@ func (p *Param) Path() string {
 
 	for _, i := range p.imports {
 		if i.Alias() == alias {
-			return i.Path()
+			return strings.ReplaceAll(i.Path(), "\"", "")
 		}
 	}
 
