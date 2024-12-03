@@ -157,10 +157,12 @@ func (m Mapper) SourceFieldByTarget(targetFullName string) (Field, bool) {
 func (m Mapper) RulesByFieldFullName(fullName string) []Rule {
 	rules := make([]Rule, 0)
 	for _, r := range m.Rules() {
-		_, ok := r.Arg(RuleArgTarget)
-		if !ok {
+		_, isTargetFieldRule := r.Arg(RuleArgTarget)
+		_, isSourceFieldRule := r.Arg(RuleArgSource)
+		if !isTargetFieldRule && !isSourceFieldRule{
 			continue
 		}
+		
 		rules = append(rules, r)
 	}
 
