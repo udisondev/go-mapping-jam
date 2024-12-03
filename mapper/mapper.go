@@ -16,18 +16,19 @@ import (
 // TODO expr
 type Mapper interface {
 
-	//@qual -s=Firstname -t=t.FirstName
-	//@qual -t=t.LastName -mn=lastNameMapper
-	//@qual -s=Number -t=t.Profile.Phone
-	//@ignore -t=t.Type
-	MapPersonToDTO(p domain.Person) (d.Person, error)
+	//@qual -s=Firstname -t=.FirstName
+	//@qual -t=.LastName -mn=lastNameMapper
+	//@qual -s=Number -t=.Profile.Phone
+	MapPersonToDTO(p domain.Person) d.Person
 
 	//@emapper
 	//@enum Simple=Simple Important=Important
 	MapPersonTypeToDto(pt domain.PersonType) d.PersonType
 
-	//@qual -s=FirstName -t=t.Firstname
-	//@qual -s=Phone -t=t.Profile.Number
+	//@qual -s=FirstName -t=.Firstname
+	//@qual -s=Phone -t=.Profile.Number
+	//@qual -t=.Firstname -s=FirstName
+	//@ignore -t=.MainAccount
 	MapPersonToDomain(p d.Person) domain.Person
 }
 

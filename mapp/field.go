@@ -61,7 +61,7 @@ func (f Field) Name() string {
 }
 
 func (f Field) FullName() string {
-	return f.fieldPath + "." + f.Name()
+	return f.fieldPath + f.Name()
 }
 
 func (f Field) Fields() []Field {

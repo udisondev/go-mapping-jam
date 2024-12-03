@@ -104,8 +104,8 @@ func (m Mapper) Results() []Result {
 
 func (m Mapper) Source() Source {
 	return Source{
-		spec:  m.Params()[0].spec,
-		Param: m.Params()[0],
+		spec: m.Params()[0].spec,
+		p:    m.Params()[0],
 	}
 }
 
@@ -119,8 +119,7 @@ func (m Mapper) Target() Target {
 func (m Mapper) SourceFieldByTarget(targetFullName string) (Field, bool) {
 	source := m.Source()
 
-	firstElemEndPos := strings.IndexAny(targetFullName, ".")
-	sourceFullName := source.Name() + targetFullName[firstElemEndPos:]
+	sourceFullName := targetFullName
 	for _, r := range m.Rules() {
 		if r.Type() != RuleTypeQual {
 			continue
@@ -132,7 +131,7 @@ func (m Mapper) SourceFieldByTarget(targetFullName string) (Field, bool) {
 		if tname != targetFullName {
 			continue
 		}
-		
+
 		if r.Type() == RuleTypeIgnore {
 			panic(fmt.Sprintf("target field: %s must be ignored", targetFullName))
 		}
@@ -159,12 +158,30 @@ func (m Mapper) RulesByFieldFullName(fullName string) []Rule {
 	for _, r := range m.Rules() {
 		_, isTargetFieldRule := r.Arg(RuleArgTarget)
 		_, isSourceFieldRule := r.Arg(RuleArgSource)
-		if !isTargetFieldRule && !isSourceFieldRule{
+		if !isTargetFieldRule && !isSourceFieldRule {
 			continue
 		}
-		
+
 		rules = append(rules, r)
 	}
 
 	return rules
+}
+
+func (m Mapper) RulesByFieldFullNameAndType(fullName string, ruleType RuleType) (Rule, bool) {
+	for _, r := range m.Rules() {
+		if r.Type() != ruleType {
+			continue
+		}
+
+		_, isTargetFieldRule := r.Arg(RuleArgTarget)
+		_, isSourceFieldRule := r.Arg(RuleArgSource)
+		if !isTargetFieldRule && !isSourceFieldRule {
+			continue
+		}
+
+		return r, true
+	}
+
+	return Rule{}, false
 }

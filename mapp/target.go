@@ -19,5 +19,13 @@ func (t Target) Name() string {
 
 func (t Target) Fields() []Field {
 	_, name := t.r.Type()
-	return extractFieldsFromStruct(t.Name(), t.r.Path(), name)
+	return extractFieldsFromStruct(".", t.r.Path(), name)
+}
+
+func (t Target) Type() (string, string) {
+	return t.r.Type()
+}
+
+func (t Target) Path() string {
+	return t.r.Path()
 }

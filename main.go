@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 
+	"github.com/udisondev/go-mapping-jam/gen"
 	"github.com/udisondev/go-mapping-jam/mapp"
 	"github.com/udisondev/go-mapping-jam/parse"
 )
@@ -16,7 +17,8 @@ func main() {
 	// rule.RegisterRuleParser("enum", parseEnumRule)
 
 	mapperFile := parse.File("./mapper/mapper.go")
-	check(mapperFile)
+	gen.Generate(mapperFile)
+	// check(mapperFile)
 }
 
 func check(mapperFile *mapp.MapperFile) {

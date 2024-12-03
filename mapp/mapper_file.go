@@ -9,8 +9,8 @@ type MapperFile struct {
 	spec *ast.File
 }
 
-func NewMapperFile(node *ast.File) *MapperFile {
-	return &MapperFile{
+func NewMapperFile(node *ast.File) MapperFile {
+	return MapperFile{
 		spec: node,
 	}
 }

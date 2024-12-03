@@ -8,7 +8,7 @@ import (
 	"github.com/udisondev/go-mapping-jam/mapp"
 )
 
-func File(filePath string) *mapp.MapperFile {
+func File(filePath string) mapp.MapperFile {
 	fset := token.NewFileSet()
 	node, err := parser.ParseFile(fset, filePath, nil, parser.ParseComments)
 	if err != nil {
