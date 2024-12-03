@@ -77,11 +77,11 @@ func (f Field) Fields() []Field {
 		typePath := ft.Obj().Pkg().Path()
 		splitedType := strings.Split(f.spec.Origin().Type().String(), ".")
 		name := splitedType[len(splitedType)-1]
-		return ExtractFieldsFromStruct(f.FullName(), typePath, name)
+		return extractFieldsFromStruct(f.FullName(), typePath, name)
 	case *types.Pointer:
 		switch ft.Underlying().(type) {
 		case *types.Struct:
-			ExtractFieldsFromStruct(f.FullName(), f.spec.Pkg().Path(), f.spec.Type().String())
+			extractFieldsFromStruct(f.FullName(), f.spec.Pkg().Path(), f.spec.Type().String())
 		}
 	}
 

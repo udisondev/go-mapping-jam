@@ -7,7 +7,7 @@ import (
 	"golang.org/x/tools/go/packages"
 )
 
-func ExtractFieldsFromStruct(filedPath, typePath, typeName string) []Field {
+func extractFieldsFromStruct(filedPath, typePath, typeName string) []Field {
 	cfg := &packages.Config{
 		Mode: packages.NeedTypes | packages.NeedImports | packages.NeedSyntax,
 		Fset: token.NewFileSet(),
