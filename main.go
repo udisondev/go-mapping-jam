@@ -27,6 +27,10 @@ func check(mapperFile *mapp.MapperFile) {
 	println("----------------------------")
 	mappers := mapperFile.Mappers()
 	for _, m := range mappers {
+		f, ok := m.SourceFieldByTarget("t.Profile.Phone")
+		if ok {
+			fmt.Printf("found f: %s\n", f.FullName())
+		}
 		fmt.Printf("mapper.Name(): %v\n", m.Name())
 		params := m.Params()
 		for _, p := range params {
@@ -48,7 +52,7 @@ func check(mapperFile *mapp.MapperFile) {
 			fmt.Printf("rule.Name(): %v\n", r.Name())
 			pack, t := r.Type()
 			fmt.Println("rule.Type():", pack, t)
-			fmt.Printf("rtule.Path(): %v\n", r.Path())
+			fmt.Printf("rule.Path(): %v\n", r.Path())
 		}
 
 		src := m.Source()

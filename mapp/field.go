@@ -46,15 +46,25 @@ type Field struct {
 	fieldPath string
 }
 
-func (f *Field) Name() string {
+func New(spec *types.Var,
+	owner *types.Struct,
+	fieldPath string) Field {
+	return Field{
+		spec:      spec,
+		owner:     owner,
+		fieldPath: fieldPath,
+	}
+}
+
+func (f Field) Name() string {
 	return f.spec.Origin().Name()
 }
 
-func (f *Field) FullName() string {
+func (f Field) FullName() string {
 	return f.fieldPath + "." + f.Name()
 }
 
-func (f *Field) Fields() []Field {
+func (f Field) Fields() []Field {
 	switch ft := f.spec.Type().(type) {
 	case *types.Basic:
 		return nil
@@ -64,21 +74,21 @@ func (f *Field) Fields() []Field {
 			return nil
 		}
 
-		path := ft.Obj().Pkg().Path()
+		typePath := ft.Obj().Pkg().Path()
 		splitedType := strings.Split(f.spec.Origin().Type().String(), ".")
 		name := splitedType[len(splitedType)-1]
-		return extractFieldsFromStruct(f.FullName(), path, name)
+		return ExtractFieldsFromStruct(f.FullName(), typePath, name)
 	case *types.Pointer:
 		switch ft.Underlying().(type) {
 		case *types.Struct:
-			extractFieldsFromStruct(f.FullName(), f.spec.Pkg().Path(), f.spec.Type().String())
+			ExtractFieldsFromStruct(f.FullName(), f.spec.Pkg().Path(), f.spec.Type().String())
 		}
 	}
 
 	return nil
 }
 
-func (f *Field) Type() TypedField {
+func (f Field) Type() TypedField {
 	switch ft := f.spec.Type().(type) {
 	case *types.Basic:
 		return BasicType{Basic: ft}

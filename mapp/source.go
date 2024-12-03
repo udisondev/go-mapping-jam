@@ -14,7 +14,7 @@ type Source struct {
 	Param
 }
 
-func (s *Source) Fields() []Field {
+func (s Source) Fields() []Field {
 	cfg := &packages.Config{
 		Mode: packages.NeedTypes | packages.NeedImports | packages.NeedSyntax,
 		Fset: token.NewFileSet(),
@@ -43,4 +43,15 @@ func (s *Source) Fields() []Field {
 	}
 
 	return fields
+}
+
+func (s Source) FieldByFullName(fullName string) (Field, bool) {
+	fields := s.Fields()
+	for _, f := range fields {	
+		expF, found := deepFieldSearch(f, fullName)
+		if found {
+			return expF, found
+		}
+	}
+	return Field{}, false
 }

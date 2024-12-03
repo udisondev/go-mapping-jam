@@ -9,7 +9,7 @@ type Target struct {
 	r    Result
 }
 
-func (t *Target) Name() string {
+func (t Target) Name() string {
 	name := t.r.Name()
 	if name != "" {
 		return name
@@ -17,7 +17,7 @@ func (t *Target) Name() string {
 	return "t"
 }
 
-func (t *Target) Fields() []Field {
+func (t Target) Fields() []Field {
 	_, name := t.r.Type()
-	return extractFieldsFromStruct(t.Name(), t.r.Path(), name)
+	return ExtractFieldsFromStruct(t.Name(), t.r.Path(), name)
 }

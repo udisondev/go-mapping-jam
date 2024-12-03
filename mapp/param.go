@@ -11,11 +11,11 @@ type Param struct {
 	imports []Import
 }
 
-func (p *Param) Name() string {
+func (p Param) Name() string {
 	return p.spec.Names[0].Name
 }
 
-func (p *Param) Type() (string, string) {
+func (p Param) Type() (string, string) {
 	switch tt := p.spec.Type.(type) {
 	case *ast.Ident:
 		return "", tt.Name
@@ -27,7 +27,7 @@ func (p *Param) Type() (string, string) {
 	}
 }
 
-func (p *Param) Path() string {
+func (p Param) Path() string {
 	alias, _ := p.Type()
 	if alias == "" {
 		return ""

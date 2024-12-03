@@ -12,7 +12,7 @@ type Result struct {
 }
 
 
-func (p *Result) Name() string {
+func (p Result) Name() string {
 	if len(p.spec.Names) == 0 {
 		return ""
 	}
@@ -20,7 +20,7 @@ func (p *Result) Name() string {
 	return p.spec.Names[0].Name
 }
 
-func (p *Result) Type() (string, string) {
+func (p Result) Type() (string, string) {
 	switch tt := p.spec.Type.(type) {
 	case *ast.Ident:
 		return "", tt.Name
@@ -32,7 +32,7 @@ func (p *Result) Type() (string, string) {
 	}
 }
 
-func (p *Result) Path() string {
+func (p Result) Path() string {
 	alias, _ := p.Type()
 	if alias == "" {
 		return ""

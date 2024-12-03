@@ -10,7 +10,7 @@ type Import struct {
 	spec *ast.ImportSpec
 }
 
-func (i *Import) Alias() string {
+func (i Import) Alias() string {
 	if i.spec.Name != nil {
 		return i.spec.Name.Name
 	}

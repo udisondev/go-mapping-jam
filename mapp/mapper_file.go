@@ -15,7 +15,7 @@ func NewMapperFile(node *ast.File) *MapperFile {
 	}
 }
 
-func (mf *MapperFile) Imports() []Import {
+func (mf MapperFile) Imports() []Import {
 	imports := make([]Import, 0, len(mf.spec.Imports))
 	for _, i := range mf.spec.Imports {
 		imp := Import{
@@ -27,7 +27,7 @@ func (mf *MapperFile) Imports() []Import {
 	return imports
 }
 
-func (mf *MapperFile) Mappers() []Mapper {
+func (mf MapperFile) Mappers() []Mapper {
 	methodList := make([]Mapper, 0)
 	ast.Inspect(mf.spec, func(n ast.Node) bool {
 		iface, ok := n.(*ast.InterfaceType)
