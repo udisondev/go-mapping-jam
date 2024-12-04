@@ -76,7 +76,7 @@ func check(mapperFile mapp.MapperFile) {
 }
 
 func deepFields(f mapp.Field) {
-	fmt.Printf("inner field: %s typeFamily: %s type: %s path: %s\n", f.FullName(), f.Type().TypeFamily(), f.Type().Type(), f.Type().Path())
+	fmt.Printf("inner field: %s typeFamily: %s type: %s path: %s\n", f.FullName(), f.Type().TypeFamily(), f.Type().TypeName(), f.Type().Path())
 	fields := f.Fields()
 	if len(fields) == 0 {
 		return

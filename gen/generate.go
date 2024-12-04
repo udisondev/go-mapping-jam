@@ -3,8 +3,6 @@ package gen
 import (
 	"fmt"
 	"log"
-	"math/rand/v2"
-	"time"
 
 	"github.com/dave/jennifer/jen"
 	"github.com/udisondev/go-mapping-jam/mapp"
@@ -13,17 +11,12 @@ import (
 const charset = "abcdefghijklmnopqrstuvwxyz"
 
 type mapperFunc struct {
+	isRoot             bool
+	file               *jen.File
 	generatedFn        *jen.Statement
 	mapper             mapp.Mapper
-	submappers         map[string]string
-	fieldMapGenerators map[mapp.TypeFamily]map[mapp.TypeFamily]func(bl mapperBlock, s, t mapp.Field)
-}
-
-type submapperFunc struct {
-	generatedFn        *jen.Statement
-	mapper             mapp.Mapper
-	source             *mapp.Field
-	target             *mapp.Field
+	source             mapp.Field
+	target             mapp.Field
 	submappers         map[string]string
 	fieldMapGenerators map[mapp.TypeFamily]map[mapp.TypeFamily]func(bl mapperBlock, s, t mapp.Field)
 }
@@ -41,17 +34,25 @@ func Generate(mf mapp.MapperFile) {
 	submappers := make(map[string]string)
 	fieldMapGenerators := map[mapp.TypeFamily]map[mapp.TypeFamily]func(bl mapperBlock, s, t mapp.Field){
 		mapp.FieldTypeBasic: {
-			mapp.FieldTypeBasic:   generateBasicToBasic,
-			mapp.FieldTypePointer: generateBasicToPointer},
-		mapp.FieldTypePointer: {mapp.FieldTypeBasic: generatePointerToBasic},
+			mapp.FieldTypeBasic:   basicToBasic,
+			mapp.FieldTypePointer: basicToPointer},
+		mapp.FieldTypePointer: {
+			mapp.FieldTypeBasic:  pointerToBasic,
+			mapp.FieldTypeStruct: pointerToStruct,
+		},
+		mapp.FieldTypeStruct: {mapp.FieldTypeStruct: structToStruct},
+		mapp.FieldTypeSlice:  {mapp.FieldTypeSlice: sliceToSlice},
 	}
 	for _, m := range mf.Mappers() {
 		mfn := mapperFunc{
+			isRoot:             true,
+			file:               f,
 			generatedFn:        f.Func().Id(m.Name()),
 			mapper:             m,
 			submappers:         submappers,
 			fieldMapGenerators: fieldMapGenerators,
 		}
+		f.Line()
 		mfn.generateSignature()
 		mfn.generateBlock()
 	}
@@ -62,18 +63,57 @@ func Generate(mf mapp.MapperFile) {
 	}
 }
 
+func (m mapperFunc) generateSignature() {
+	if !m.isRoot {
+		m.generatedFn.Params(jen.Id("src").Qual(m.source.Type().Path(), m.source.Type().TypeName()))
+		m.generatedFn.Qual(m.target.Type().Path(), m.target.Type().TypeName())
+		return
+	}
+
+	for i, p := range m.mapper.Params() {
+		_, typeName := p.Type()
+		pname := p.Name()
+		if i == 0 {
+			pname = "src"
+		}
+		m.generatedFn.Params(jen.Id(pname).Qual(p.Path(), typeName))
+	}
+
+	for _, r := range m.mapper.Results() {
+		_, typeName := r.Type()
+		m.generatedFn.Qual(r.Path(), typeName)
+	}
+}
+
 func (m mapperFunc) generateBlock() {
 	m.generatedFn.BlockFunc(func(g *jen.Group) {
 		bl := mapperBlock{
 			Group:      g,
 			mapperFunc: m,
 		}
-		target := m.mapper.Target()
-		_, t := target.Type()
-		bl.Id("target").Op(":=").Qual(target.Path(), t+"{}")
-		for _, tf := range target.Fields() {
+		var targetPath string
+		var targetTypeName string
+		var targetFields []mapp.Field
+
+		if m.isRoot {
+			target := m.mapper.Target()
+			targetPath = target.Path()
+			_, t := target.Type()
+			targetTypeName = t
+			targetFields = target.Fields()
+		} else {
+			target := m.target
+			targetPath = target.Type().Path()
+			targetTypeName = target.Type().TypeName()
+			targetFields = target.Fields()
+		}
+
+		bl.Id("target").Op(":=").Qual(targetPath, targetTypeName+"{}")
+		bl.Line()
+		for _, tf := range targetFields {
 			bl.generateTargetMapping(tf)
 		}
+		bl.Line()
 		bl.Return(jen.Id("target"))
 	})
 
@@ -96,78 +136,4 @@ func (bl mapperBlock) generateTargetMapping(target mapp.Field) {
 	}
 
 	genFn(bl, source, target)
-}
-
-func (m mapperFunc) generateSignature() {
-	for i, p := range m.mapper.Params() {
-		_, typeName := p.Type()
-		pname := p.Name()
-		if i == 0 {
-			pname = "src"
-		}
-		m.generatedFn.Params(jen.Id(pname).Qual(p.Path(), typeName))
-	}
-
-	for _, r := range m.mapper.Results() {
-		_, typeName := r.Type()
-		m.generatedFn.Qual(r.Path(), typeName)
-	}
-}
-
-func generateBasicToBasic(bl mapperBlock, s, t mapp.Field) {
-	bl.Id("target").Dot(t.Name()).Op("=").Id("src").Dot(s.Name())
-}
-
-func generatePointerToBasic(bl mapperBlock, s, t mapp.Field) {
-	pt, ok := s.Type().(mapp.PointerType)
-	if !ok {
-		panic("is not a pointer")
-	}
-
-	if t.Type().Type() != s.Type().Type() {
-		panic(fmt.Sprintf(
-			"could not mapp different types source: '*%s' target: %s",
-			pt.Elem().TypeFamily(),
-			t.Type().TypeFamily()))
-	}
-
-	bl.If(
-		jen.Id("src").Dot(s.Name()).Op("!=").Nil(),
-	).Block(
-		jen.Id("target").Dot(t.Name()).Op("=").Add(jen.Op("*")).Id("src").Dot(s.Name()),
-	)
-}
-
-func generateBasicToPointer(bl mapperBlock, s, t mapp.Field) {
-	pt, ok := t.Type().(mapp.PointerType)
-	if !ok {
-		panic("is not a pointer")
-	}
-
-	if pt.Elem().TypeFamily() != mapp.FieldTypeBasic {
-		panic("source refers to not basic")
-	}
-
-	if s.Type().TypeFamily() != pt.Elem().TypeFamily() {
-		panic(fmt.Sprintf(
-			"could not mapp different types source: '%s' target: pointer to %s",
-			s.Type().TypeFamily(),
-			pt.Elem().TypeFamily()))
-	}
-
-	bl.Id("target").Dot(t.Name()).Op("=").Add(jen.Op("&")).Id("src").Dot(s.Name())
-}
-
-func genRandomName(length int) string {
-	seed := time.Now().UnixNano()
-
-	src := rand.NewPCG(uint64(seed), uint64(seed>>32))
-	r := rand.New(src)
-
-	result := make([]byte, length)
-	for i := range result {
-		result[i] = charset[r.IntN(len(charset))]
-	}
-	return string(result)
-
 }
