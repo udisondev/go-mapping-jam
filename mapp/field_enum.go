@@ -13,7 +13,7 @@ import (
 
 const (
 	// FieldTypeBasic is a FieldType of type Basic.
-	FieldTypeBasic FieldType = iota
+	FieldTypeBasic TypeFamily = iota
 	// FieldTypeNamed is a FieldType of type Named.
 	FieldTypeNamed
 	// FieldTypeStruct is a FieldType of type Struct.
@@ -28,7 +28,7 @@ var ErrInvalidFieldType = errors.New("not a valid FieldType")
 
 const _FieldTypeName = "basicnamedstructpointerslice"
 
-var _FieldTypeMap = map[FieldType]string{
+var _FieldTypeMap = map[TypeFamily]string{
 	FieldTypeBasic:   _FieldTypeName[0:5],
 	FieldTypeNamed:   _FieldTypeName[5:10],
 	FieldTypeStruct:  _FieldTypeName[10:16],
@@ -37,7 +37,7 @@ var _FieldTypeMap = map[FieldType]string{
 }
 
 // String implements the Stringer interface.
-func (x FieldType) String() string {
+func (x TypeFamily) String() string {
 	if str, ok := _FieldTypeMap[x]; ok {
 		return str
 	}
@@ -46,12 +46,12 @@ func (x FieldType) String() string {
 
 // IsValid provides a quick way to determine if the typed value is
 // part of the allowed enumerated values
-func (x FieldType) IsValid() bool {
+func (x TypeFamily) IsValid() bool {
 	_, ok := _FieldTypeMap[x]
 	return ok
 }
 
-var _FieldTypeValue = map[string]FieldType{
+var _FieldTypeValue = map[string]TypeFamily{
 	_FieldTypeName[0:5]:   FieldTypeBasic,
 	_FieldTypeName[5:10]:  FieldTypeNamed,
 	_FieldTypeName[10:16]: FieldTypeStruct,
@@ -60,9 +60,9 @@ var _FieldTypeValue = map[string]FieldType{
 }
 
 // ParseFieldType attempts to convert a string to a FieldType.
-func ParseFieldType(name string) (FieldType, error) {
+func ParseFieldType(name string) (TypeFamily, error) {
 	if x, ok := _FieldTypeValue[name]; ok {
 		return x, nil
 	}
-	return FieldType(0), fmt.Errorf("%s is %w", name, ErrInvalidFieldType)
+	return TypeFamily(0), fmt.Errorf("%s is %w", name, ErrInvalidFieldType)
 }

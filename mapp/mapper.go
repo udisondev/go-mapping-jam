@@ -174,9 +174,13 @@ func (m Mapper) RulesByFieldFullNameAndType(fullName string, ruleType RuleType) 
 			continue
 		}
 
-		_, isTargetFieldRule := r.Arg(RuleArgTarget)
-		_, isSourceFieldRule := r.Arg(RuleArgSource)
+		tflname, isTargetFieldRule := r.Arg(RuleArgTarget)
+		sflname, isSourceFieldRule := r.Arg(RuleArgSource)
 		if !isTargetFieldRule && !isSourceFieldRule {
+			continue
+		}
+
+		if tflname != fullName && sflname != fullName {
 			continue
 		}
 

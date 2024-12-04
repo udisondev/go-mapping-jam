@@ -21,7 +21,7 @@ func main() {
 	// check(mapperFile)
 }
 
-func check(mapperFile *mapp.MapperFile) {
+func check(mapperFile mapp.MapperFile) {
 	imports := mapperFile.Imports()
 	for _, i := range imports {
 		fmt.Println("Import", "Alias:", i.Alias(), "Path:", i.Path())
@@ -76,7 +76,7 @@ func check(mapperFile *mapp.MapperFile) {
 }
 
 func deepFields(f mapp.Field) {
-	fmt.Printf("inner field: %s type: %s\n", f.FullName(), f.Type().ShortType())
+	fmt.Printf("inner field: %s typeFamily: %s type: %s path: %s\n", f.FullName(), f.Type().TypeFamily(), f.Type().Type(), f.Type().Path())
 	fields := f.Fields()
 	if len(fields) == 0 {
 		return
