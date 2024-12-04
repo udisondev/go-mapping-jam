@@ -37,11 +37,16 @@ func Generate(mf mapp.MapperFile) {
 			mapp.FieldTypeBasic:   basicToBasic,
 			mapp.FieldTypePointer: basicToPointer},
 		mapp.FieldTypePointer: {
-			mapp.FieldTypeBasic:  pointerToBasic,
-			mapp.FieldTypeStruct: pointerToStruct,
+			mapp.FieldTypeBasic:   pointerToBasic,
+			mapp.FieldTypeStruct:  pointerToStruct,
+			mapp.FieldTypePointer: pointerToPointer,
 		},
-		mapp.FieldTypeStruct: {mapp.FieldTypeStruct: structToStruct},
-		mapp.FieldTypeSlice:  {mapp.FieldTypeSlice: sliceToSlice},
+		mapp.FieldTypeStruct: {
+			mapp.FieldTypeStruct:  structToStruct,
+			mapp.FieldTypePointer: structToPointer,
+		},
+		mapp.FieldTypeSlice: {mapp.FieldTypeSlice: sliceToSlice},
+		mapp.FieldTypeNamed: {mapp.FieldTypeNamed: namedToNamed},
 	}
 	for _, m := range mf.Mappers() {
 		mfn := mapperFunc{
@@ -132,7 +137,7 @@ func (bl mapperBlock) generateTargetMapping(target mapp.Field) {
 
 	genFn, ok := bl.fieldMapGenerators[source.Type().TypeFamily()][target.Type().TypeFamily()]
 	if !ok {
-		return
+		panic(fmt.Sprintf("unsupported mapping from: %s to %s", source.Type().TypeFamily(), target.Type().TypeFamily()))
 	}
 
 	genFn(bl, source, target)

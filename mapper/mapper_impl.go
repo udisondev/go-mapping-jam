@@ -16,30 +16,30 @@ func MapPersonToDTO(src domain.Person) dto.Person {
 	}
 	target.LastName = src.LastName
 	target.MiddleName = &src.MiddleName
-	target.MainAccount = rhlmhkrnwh(src.MainAccount)
+	target.MainAccount = utslyllzrw(src.MainAccount)
 	targetAccountSlice := make([]external.Account, 0, len(target.Account))
 	for _, it := range src.Account {
-		targetAccountSlice = append(targetAccountSlice, rhlmhkrnwh(it))
+		targetAccountSlice = append(targetAccountSlice, utslyllzrw(it))
 	}
 	target.Account = targetAccountSlice
 	if src.Profile != nil {
-		target.Profile = maszhjyrtz(*src.Profile)
+		target.Profile = lnvfafmyae(*src.Profile)
 	}
 	target.Projects = src.Projects
 
 	return target
 }
 
-func rhlmhkrnwh(src external.Account) external.Account {
+func utslyllzrw(src external.Account) external.Account {
 	target := external.Account{}
 
-	target.Login = lzguzvqgzh(src.Login)
+	target.Login = drrurlqyay(src.Login)
 	target.Password = src.Password
 
 	return target
 }
 
-func lzguzvqgzh(src user.Login) user.Login {
+func drrurlqyay(src user.Login) user.Login {
 	target := user.Login{}
 
 	target.Value = src.Value
@@ -47,7 +47,7 @@ func lzguzvqgzh(src user.Login) user.Login {
 	return target
 }
 
-func maszhjyrtz(src domain.Profile) dto.Profile {
+func lnvfafmyae(src domain.Profile) dto.Profile {
 	target := dto.Profile{}
 
 	target.Phone = src.Number
@@ -65,7 +65,7 @@ func MapPersonToDomain(src dto.Person) domain.Person {
 	}
 	targetAccountSlice := make([]external.Account, 0, len(target.Account))
 	for _, it := range src.Account {
-		targetAccountSlice = append(targetAccountSlice, rhlmhkrnwh(it))
+		targetAccountSlice = append(targetAccountSlice, utslyllzrw(it))
 	}
 	target.Account = targetAccountSlice
 	target.Projects = src.Projects
